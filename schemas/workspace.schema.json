@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TAO optional workspace policy and artifacts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "interval_days",
+    "quarantine_days",
+    "last_checked",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "interval_days": {
+      "const": 7
+    },
+    "quarantine_days": {
+      "const": 7
+    },
+    "last_checked": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "producer",
+          "revision",
+          "kind",
+          "reproduce",
+          "movable",
+          "released",
+          "evidence",
+          "state"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "producer": {
+            "type": "string",
+            "pattern": "^(lead|worker-[1-9][0-9]*)$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "enum": [
+              "temporary",
+              "intermediate",
+              "deliverable",
+              "evidence"
+            ]
+          },
+          "reproduce": {
+            "type": "string"
+          },
+          "movable": {
+            "type": "boolean"
+          },
+          "released": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "current",
+              "quarantined",
+              "archived",
+              "deleted"
+            ]
+          },
+          "location": {
+            "type": "string"
+          },
+          "stored_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}

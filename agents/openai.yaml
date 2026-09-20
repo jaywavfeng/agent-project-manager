@@ -1,6 +1,6 @@
 interface:
   display_name: "Tiered Agent Orchestrator"
-  short_description: "Reusable workers with lean, repository-backed handoffs"
-  default_prompt: "$tao Resume from repository state, reuse Workers, use explicit Python CLI calls, keep coordination below 10% when measured, and follow strict route evidence with passive event waits."
+  short_description: "Cost-aware execution, handoffs and workspace housekeeping"
+  default_prompt: "$tao Resume from repository state, choose direct execution or reusable independent Workers by total cost, verify results, and keep coordination and the active workspace small."
 policy:
   allow_implicit_invocation: false

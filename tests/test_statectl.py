@@ -24,6 +24,13 @@ class StateCtlTests(unittest.TestCase):
         self.temp.cleanup()
 
     def run_cli(self, *args: str) -> tuple[int, str, str]:
+        if args and args[0] == "set-review-status" and "--assignment-revision" not in args:
+            path = self.root / ".tiered-agent/review/STATUS.json"
+            if path.exists():
+                revision = json.loads(path.read_text(encoding="utf-8")).get("revision", 1)
+                args = (*args, "--assignment-revision", str(revision))
+            if "--status" in args and args[args.index("--status") + 1] == "completed":
+                args = (*args, "--verdict", "approved")
         stdout = io.StringIO()
         stderr = io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):

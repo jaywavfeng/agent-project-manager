@@ -32,3 +32,10 @@ jobs:
           python scripts/statectl.py notification-context --help
           python scripts/benchmark.py --help
           python scripts/benchmark.py overhead --help
+          python scripts/statectl.py control-worker --help
+          python scripts/statectl.py cancel-review --help
+          python scripts/statectl.py prepare-message --help
+          python scripts/statectl.py record-message --help
+          python scripts/statectl.py housekeep --help
+          python scripts/statectl.py workspace-register --help
+          python scripts/statectl.py workspace-restore --help

@@ -1,53 +1,38 @@
 # Runtime State Contract
 
-Read once before modifying runtime state. Workers normally use their role's `context` output instead of loading this entire reference on every continuation. All helper invocations use an explicit Python interpreter as shown in [SKILL.md](../SKILL.md).
+Read once before changing runtime state; ordinary continuation uses role context.
 
-## Ownership and canonical facts
+| Files | Writer and purpose |
+|---|---|
+| STATE.json, PLAN.md, OWNER_DIRECTIVES.md | Lead: lifecycle, stable criteria, current Owner direction |
+| HANDOFF.md, optional OWNER_STATUS.md | Lead: bounded takeover packet and optional human report |
+| TRANSPORT.json | Lead: bindings and legacy receipts; never lifecycle authority |
+| workers/worker-N/TASK.md | Lead: current assignment and revision |
+| Worker STATUS.json and BLOCKER.md | Current executor: results, evidence and next action |
+| review/TASK.md | Lead: current review criteria |
+| review/STATUS.json and REPORT.md | Assigned reviewer: revision, progress and verdict |
+| Per-role DELIVERY.json | Sending role: current receipt per destination |
+| WORKSPACE.json, HOUSEKEEPING.json | Lead/helper: registered directories, schedule and latest cleanup summary |
+| inbox/owner/*.md | Originating Worker: verbatim feedback; Lead resolves and archives |
 
-| File | Writer | Purpose |
-|---|---|---|
-| `STATE.json` | Lead | Schema-v1 lifecycle, profile, role registry, scope/dependencies, next actor |
-| `PLAN.md` | Lead | Stable goal, criteria, constraints, milestones and validation strategy |
-| `OWNER_DIRECTIVES.md` | Lead | Authoritative Owner decisions and unresolved choices, no transcript |
-| `HANDOFF.md` | Lead | Compact current cold-start packet with links to evidence |
-| `OWNER_STATUS.md` | Lead | Human report, never machine authority |
-| `TRANSPORT.json` (optional) | Lead | Host task bindings and current dispatch receipt; no lifecycle authority |
-| `workers/worker-N/TASK.md` | Lead | Current bounded assignment with revision |
-| `workers/worker-N/STATUS.json`, `BLOCKER.md` | That Worker | Result, validation, blocker and next action |
-| `inbox/owner/<event-id>.md` | Originating Worker; Lead resolves | Verbatim directional/ambiguous feedback |
-| `review/TASK.md` | Lead | Review criteria and justified level |
-| `review/STATUS.json`, `REPORT.md` | Assigned Reviewer | Scoped review decision and evidence |
+Default Worker executor is worker. Optional executor=lead records a takeover without changing role identity or releasing scope. Controlled assignments require --assignment-revision and matching --actor worker|lead for status writes. These checks coordinate trusted agents; they are not OS authentication. Workers do not rewrite global state, bindings or another role's files.
 
-Workers own only their assigned code scope and listed files. No Worker writes global state, another Worker's files or transport configuration. The Lead's sole normal write to Worker status is `reassign-worker` after completion. It archives the old assignment then resets status. Scopes and dependencies remain enforced; `inactive` does not satisfy a dependency.
+## Transitions
 
-Machine state excludes logs, secrets, concrete model names and large summaries. Routing/receipt details belong in optional transport, whose records do not prove billed usage. Old schema-v1 projects without transport or an Owner report remain usable; no migration is needed.
+Worker states remain ready, active, blocked, waiting-owner, completed and inactive. control-worker --action resume|cancel|takeover requires revision, reason and quiescence-evidence. All three archive the actual old files and advance revision; resume produces ready/worker, takeover ready/lead, cancel inactive/worker. Dependencies still constrain execution and scope overlap is forbidden. Completed tasks use reassign-worker. Reassigning other stopped statuses requires reason and quiescence evidence; previously controlled roles also require revision.
 
-## Transitions and history
+History records truthful prior states, including blocked or cancelled work. Terminal historical dependencies do not track a role's next assignment. Nonterminal dependents still prevent upstream reassignment; inactive never satisfies an input dependency. Assignment revisions and existing history directory names remain compatible with v0.6.0.
 
-Worker states: `ready`, `active`, `blocked`, `waiting-owner`, `completed`, `inactive`. `completed → ready` is only a Lead reassignment. Relay-driven status writes pass the current `--assignment-revision` to reject stale messages. A blocked Worker resumes only after a real resolution; do not resend a blocked task merely to see if it now works.
+assign-review gives each new review a revision. set-review-status passes --assignment-revision; a completed review has verdict approved or changes-requested. An absent legacy verdict never implies approval: inspect the report and record it. cancel-review requires revision, reason and stopped reviewer evidence, archives the review, detaches it and returns to execution while retaining review.required. Old reviewer writes fail. Subsequent implementation invalidates completed review as before.
 
-`reassign-worker` archives task, status and blocker under `workers/worker-N/history/assignment-NNNN/`. Current assignment files alone select the work; a milestone never creates a new role. Existing tasks without a revision heading are revision 1.
+Completion rejects unfinished non-inactive Workers, unresolved feedback and required review without current approval. Existing completed legacy snapshots remain readable; their historical state is not rewritten. reopen-project snapshots completion before new work.
 
-`reopen-project` archives completed global and role state in `history/completion-NNNN/` before returning to `planning/active`. Read-only questions leave completed state frozen. A completed Worker remains intact until reassigned.
+## Updates and reads
 
-Review assignment archives completed review evidence in `review/history/review-NNNN/`. Resuming implementation detaches an old review while preserving the review requirement; stale approval cannot satisfy completion. Strong review requires `--strong-justification`. Completion rejects unfinished non-inactive Workers, pending Owner feedback or unfinished/stale required review.
+Candidate multi-file state is validated before writes; existing operation markers remain until resulting state validates. An interrupted update requires explicit recover. Newer conflicting content is protected. Ordinary commands do not scan historical bodies; validate explicitly checks history. Status, context and previews never repair files.
 
-## Read and update cheaply
+context --role lead pages active Workers and pending events with --offset and --limit (default 20, maximum 100), reports terminal counts, and omits old verification bodies. status --json retains the complete compatibility interface. Worker/reviewer packets include their task, current revision and required evidence pointers. Read historical files by a specific role/revision/event, not a full-tree scan.
 
-For `$tao continue lead`, `context --role lead` returns current status, handoff and pointers to directives/plan/events. These identify final goal, completed work, current position, verified results, constraints, blockers, next action and Owner decision without chat history. Read only relevant plan sections and active blocker files; do not scan archives by default.
+Owner-event frontmatter, not quoted message text, determines pending/resolved state. Housekeeping moves resolved events to inbox/owner/history; resolving by ID works in either location and is idempotent. Unresolved events never enter cold storage. Human summaries do not override machine state.
 
-`context --role worker-N` returns current task/status, direct dependency statuses and an active blocker. `context --role reviewer-N` requires a current review assignment. All packets include absolute executable/script arguments. They are transient output, not another stored summary database.
-
-`status` and ordinary updates validate current schema, paths, scope/dependencies and lifecycle invariants without inspecting historical contents. `validate` explicitly checks full history and transport bindings. Archiving operations check their affected history. `status`, `context`, dispatch/notification context and `validate` never mutate or recover files. If an interrupted update marker exists, they report it; explicitly run the `recover` subcommand through Python to invoke existing recovery. Conflicting newer content remains protected.
-
-Persist meaningful assignment, validation, blocker, review, completion or direction transitions, never each command. `HANDOFF.md` compresses current facts; the plain-language management report in `OWNER_STATUS.md` changes only when the human-visible picture changes. Neither summary duplicates logs or overrides state.
-
-## Messages and evidence
-
-[Host dispatch](host-dispatch.md) owns the transport workflow and receipt format. Messages only wake a role to read canonical state. Owner-created threads use the model-only gate when visible and continue when unavailable; manual reasoning is not gated. Native automation needs machine-readable actual/effective values for model and reasoning. Acceptance is not attestation, contradictory metadata blocks execution, and children never recursively self-prove their route. Neither route establishes billing without telemetry.
-
-Owner-event frontmatter controls pending/resolved status; verbatim message text cannot forge an event state. For ambiguous feedback, store exact words, pause conflicting work, and notify the Lead once. Read-only requests on completed projects do not create events.
-
-> **Prefer the simplest mechanism that is sufficiently reliable for the actual failure modes of the project.**
-
-The <= 10% coordination token target does not justify another audit system. Use simple state, existing atomic replacement and targeted recovery after a concrete error. A timeout is not a milestone; use passive event waits without repeated analysis.
+Details: [host messages](host-dispatch.md), [artifact housekeeping](workspace-housekeeping.md), [escalation](escalation-and-review.md).

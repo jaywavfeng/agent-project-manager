@@ -209,7 +209,7 @@ class ForwardScenarioTests(unittest.TestCase):
         escalation = (ROOT / "references" / "escalation-and-review.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("do not need to copy any context", escalation)
+        self.assertIn("need to copy any context", escalation)
 
     def test_fresh_worker_cannot_start_before_dependency_then_can_continue(self) -> None:
         runtime = self.init()

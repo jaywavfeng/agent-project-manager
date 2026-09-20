@@ -13,21 +13,52 @@
     "last_updated"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": {
+      "const": 1
+    },
     "reviewer_id": {
       "oneOf": [
-        { "type": "null" },
-        { "type": "string", "pattern": "^reviewer-[1-9][0-9]*$" }
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^reviewer-[1-9][0-9]*$"
+        }
       ]
     },
     "status": {
-      "enum": ["not-requested", "ready", "active", "blocked", "completed"]
+      "enum": [
+        "not-requested",
+        "ready",
+        "active",
+        "blocked",
+        "completed"
+      ]
     },
-    "summary": { "type": "string" },
+    "summary": {
+      "type": "string"
+    },
     "verification": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
-    "last_updated": { "type": "string", "format": "date-time" }
+    "last_updated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "verdict": {
+      "enum": [
+        null,
+        "approved",
+        "changes-requested"
+      ]
+    }
   }
 }

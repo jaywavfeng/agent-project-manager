@@ -14,7 +14,7 @@ class SkillContractTests(unittest.TestCase):
         match = re.match(r'^---\n(.*?)\n---\n', text, re.DOTALL)
         self.assertIsNotNone(match)
         self.assertIn('name: tao', match.group(1))
-        self.assertIn('version: "0.6.0"', match.group(1))
+        self.assertIn('version: "0.7.0"', match.group(1))
         description = re.search(r'(?m)^description:\s*(.+)$', match.group(1)).group(1)
         self.assertLessEqual(len(description), 1024)
         self.assertLess(len(text.split()), 1600)
@@ -48,7 +48,8 @@ class SkillContractTests(unittest.TestCase):
         value = json.loads((ROOT / 'evals/evals.json').read_text(encoding='utf-8'))
         self.assertEqual(value['skill_name'], 'tao')
         ids = [item['id'] for item in value['evals']]
-        self.assertEqual(ids, list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
+        self.assertEqual(ids[:26], list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
+        self.assertEqual(len(ids), len(set(ids)))
         for item in value['evals']:
             self.assertTrue(item['prompt'].strip())
             self.assertTrue(item['expected_output'].strip())
@@ -57,7 +58,7 @@ class SkillContractTests(unittest.TestCase):
     def test_public_docs_share_version_interfaces_and_evidence_boundary(self):
         for name in ('README.md', 'README.zh-CN.md'):
             text = (ROOT / name).read_text(encoding='utf-8')
-            for marker in ('v0.6.0', '$tao continue worker-1', '$tao continue lead', '$tao status',
+            for marker in ('v0.7.0', '$tao continue worker-1', '$tao continue lead', '$tao status',
                            'Benchmark pending', '10%', 'purpose_usage', 'TRANSPORT.json', 'VS Code',
                            'python scripts/statectl.py', 'Apache-2.0', 'reassign-worker', 'reopen-project'):
                 self.assertIn(marker, text)

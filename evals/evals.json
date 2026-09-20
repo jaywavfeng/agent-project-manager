@@ -4,14 +4,14 @@
     {
       "id": "A",
       "prompt": "$tao Use tiered orchestration to add a production-ready import pipeline across this repository. The architecture is unclear and implementation will take several stages.",
-      "expected_output": "The Project Lead creates repository state, distills a plan, assigns one bounded economy Worker by default, uses native dispatch only when the host returns matching actual/effective model and reasoning metadata, otherwise gives the Owner the manual fallback, and provides a one-line continuation command.",
+      "expected_output": "Lead creates only useful durable state, assigns a reusable economy Worker for sustained work, and uses an authorized independent conversation with explicit model/reasoning selection. Unsupported creation gets one manual setup instruction.",
       "assertions": [
         "The response initializes durable project state rather than relying on chat history.",
         "Exactly one Worker is recommended unless independent parallel work is demonstrated.",
         "The Worker task includes scope and completion criteria.",
         "The Lead does not use a Worker that silently inherits the strong model.",
         "After dispatch, the Lead yields for an event instead of polling Worker status.",
-        "The Lead verifies machine-readable actual/effective model and reasoning rather than trusting acceptance, echoed arguments, or a nickname."
+        "Missing effective metadata is labeled unverified; contradictory metadata requires correction and billing savings are not inferred."
       ]
     },
     {
@@ -137,21 +137,21 @@
     {
       "id": "N",
       "prompt": "$tao The native spawn call accepted model=gpt-5.6-luna and reasoning_effort=xhigh and returned success plus a child ID, but no actual/effective model or reasoning metadata.",
-      "expected_output": "The Project Lead treats the native route as unverified, prevents substantive child work, preserves worker-1, and asks the Owner to continue the same formal assignment in a manually selected Luna conversation (xhigh recommended, not gated) instead of letting Sol perform it.",
+      "expected_output": "Do not use the automatic subagent. Model arguments do not establish billed usage. Reuse an independent Worker or give one manual independent-conversation setup instruction.",
       "assertions": [
-        "Accepted or echoed request fields are not treated as effective-route proof.",
-        "The unverified native runtime fails closed before substantive work.",
-        "The formal Worker ID is reused and Sol does not duplicate the assignment."
+        "Automatic subagents remain disabled.",
+        "Requested routing is not correct-billing evidence.",
+        "No recursive child self-inspection or repeated selector proof."
       ]
     },
     {
       "id": "O",
       "prompt": "$tao Review is required, but the native Reviewer tool cannot return actual/effective Terra model and reasoning metadata or per-conversation usage attribution.",
-      "expected_output": "The Project Lead uses a manually selected Terra Reviewer conversation, keeps billing attribution unknown unless telemetry is available, and does not let a native Reviewer silently inherit Sol or let Sol absorb routine review.",
+      "expected_output": "Use an authorized independent reviewer conversation with explicit model/reasoning selection, labeling unavailable effective routing unverified. If the tool is only a subagent or cannot create independent conversations, use manual setup.",
       "assertions": [
-        "Reviewer dispatch uses the same fail-closed effective-route gate as Worker dispatch.",
-        "Routing evidence and billing evidence are distinguished.",
-        "Missing telemetry prevents a token or credit savings claim."
+        "Review requirement is retained.",
+        "Independent conversations and subagents are distinguished.",
+        "No claimed billing savings from requested settings."
       ]
     },
     {
@@ -162,7 +162,7 @@
         "Unavailable manual model information does not block continuation.",
         "Manual reasoning is neither inspected nor validated.",
         "The Owner is not asked to resend $tao continue worker-3 or open a replacement conversation.",
-        "Native actual/effective model and reasoning attestation remains unchanged for automatic dispatch."
+        "Independent-conversation routing and automatic subagent prohibition remain distinct."
       ]
     },
     {
@@ -210,11 +210,11 @@
     {
       "id": "U",
       "prompt": "$tao continue lead. This host accepts model and thinking fields but returns only requested overrides. The Owner authorizes creating a new economy Worker.",
-      "expected_output": "Do not create a substantive Worker; missing actual model and reasoning proof requires the manual setup fallback even with creation authority.",
+      "expected_output": "If the host can create an independent conversation and accepts explicit model/reasoning selection, create it under existing authority and label missing effective routing unverified. If those capabilities are absent, provide one manual setup instruction.",
       "assertions": [
-        "No substantive native dispatch occurs.",
-        "No accepted request or echoed setting is represented as effective metadata.",
-        "Existing manual Worker trust is not tightened."
+        "Subagents are not substituted for independent conversations.",
+        "Contradictory effective metadata requires correction.",
+        "No routing or billing savings claim is made from echoed parameters."
       ]
     },
     {
@@ -265,6 +265,56 @@
         "Use coordination/task, not coordination/total.",
         "Lead architecture and acceptance are task work, not automatically coordination.",
         "Missing classification and synthetic usage cannot support a numeric success claim."
+      ]
+    },
+    {
+      "id": "AA",
+      "prompt": "$tao continue lead. The stopped Worker is blocked, and a short local repair will unblock the project.",
+      "expected_output": "Lead uses safe takeover and executes the repair directly when cheaper.",
+      "assertions": [
+        "Confirmed writer quiescence precedes takeover.",
+        "Revision advances; scope and partial evidence remain.",
+        "No fabricated completion or unnecessary new Worker."
+      ]
+    },
+    {
+      "id": "AB",
+      "prompt": "$tao continue lead. Reviewer is blocked waiting for implementation changes.",
+      "expected_output": "Cancel the stopped review, repair and request a fresh review.",
+      "assertions": [
+        "Review requirement is retained.",
+        "Changes-requested is not approval.",
+        "Old reviewer revision cannot write to the new review."
+      ]
+    },
+    {
+      "id": "AC",
+      "prompt": "$tao continue lead. Milestone completed; registered run directories contain released temporary output, evidence, and intermediate artifacts.",
+      "expected_output": "Preview and apply bounded housekeeping while preserving evidence.",
+      "assertions": [
+        "Only registered released reproducible temporary output is quarantined.",
+        "Evidence and deliverables remain usable.",
+        "No deletion before seven days; no background timer."
+      ]
+    },
+    {
+      "id": "AD",
+      "prompt": "$tao status. The project has years of history and many archived logs.",
+      "expected_output": "Read current status without cleanup or loading history bodies.",
+      "assertions": [
+        "Status request does not mutate.",
+        "Normal context reports active work with pagination and terminal counts.",
+        "History is retrieved only for a concrete need."
+      ]
+    },
+    {
+      "id": "AE",
+      "prompt": "$tao continue lead. A cleanup candidate contains a junction and a currently referenced validation file.",
+      "expected_output": "Skip unsafe or referenced candidates and continue useful work.",
+      "assertions": [
+        "No traversal of junction/symlink targets.",
+        "Current evidence remains at a usable path.",
+        "Unknown files are not classified by age or extension."
       ]
     }
   ]

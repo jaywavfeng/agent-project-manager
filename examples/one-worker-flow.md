@@ -1,17 +1,22 @@
-# One reusable Worker, two assignments
+# One Reusable Worker
 
-This example assumes an Owner-authorized Lead and Worker bound to the same directory. It uses host messaging, not a background Python service. The actual executable/script path comes from the installed skill; run all subcommands through Python.
+1. Lead chooses direct execution or a durable assignment based on total cost. For sustained work, initialize state, write stable criteria, add worker-1 and enter execution.
+2. Bind independent Lead/Worker conversations once. If creation is unavailable, give the Owner one setup instruction. Do not substitute an automatic subagent.
+3. Use prepare-message, host send and record-message. Worker reads revision-specific context, executes in scope and records actual validation.
+4. Worker sends a result transition through the same prepare/send/record workflow. Lead verifies the result and proceeds autonomously within existing authority.
+5. If blocked, Lead resolves the cause and confirms execution/process quiescence, then uses control-worker resume or takeover. No fake completion is needed. A stopped assignment can also be cancelled and reassigned.
+6. At the milestone, register/release appropriate generated run directories and apply housekeeping. Evidence stays usable; temporary artifacts enter quarantine. Reassign the same completed Worker for M2.
+7. If useful review is required, bind reviewer-1 and use the same message loop. Only a current approved verdict satisfies required review. Cancel a blocked review to fix implementation, then reassign it.
+8. Verify final criteria, perform the final tidy, update the bounded handoff and complete the project. Future read-only questions leave it frozen; actionable changes use reopen-project.
 
-1. Lead initializes state, writes the plan, registers `worker-1`, and sets active execution. Bind `lead` and `worker-1` using final host task IDs and Owner selection evidence. Keep the Owner's manual model/reasoning settings.
-2. Read the idle Worker's host metadata once and save the normalized observation. Generate `dispatch-context`, reserve `pending` with `record-dispatch`, send the returned prompt via `send_message_to_thread`, then record confirmed `sent` or an accurate failure/unknown result.
-3. Worker starts with the explicit CLI invocation below (replace paths), validates the current revision and scope, implements and validates M1, then records completed status with that revision. Generate `notification-context` and send one callback to the bound Lead.
-4. Lead checks actual results and acceptance, then uses `reassign-worker` to archive M1 and publish M2 as revision 2. Repeat dispatch to the same host task. A late revision-1 message fails the context/status guard and does not execute M2 accidentally.
-5. After M2, Lead performs substantive acceptance and any required review, marks the project complete, and updates handoff/human report once. A completed project answers status without mutation; actionable later work uses `reopen-project` then the same Worker.
+From the repository:
 
-```powershell
-& "<absolute python.exe>" "<absolute skill directory>\scripts\statectl.py" context --project-root "<project directory>" --role worker-1 --assignment-revision 1
+```console
+python scripts/statectl.py context --project-root /path/to/project --role lead
+python scripts/statectl.py control-worker --help
+python scripts/statectl.py prepare-message --help
+python scripts/statectl.py workspace-register --help
+python scripts/statectl.py housekeep --project-root /path/to/project
 ```
 
-For a missing binding/tool, manually continue `$tao continue worker-1`, then `$tao continue lead`. For missing native actual/effective metadata, do not create a speculative Worker. For uncertain message delivery, reconcile once; lack of a message in a bounded history page does not prove failure. A timeout is not a milestone; end an unchanged wait without polling.
-
-Scope/acceptance files, not chat replies, determine the result. See [host dispatch](../references/host-dispatch.md) for argument and normalized receipt details. The synthetic two-assignment acceptance test is `tests/test_relay.py`; it is not a live host run.
+Installed usage follows the explicit interpreter and absolute script path in [SKILL.md](../SKILL.md). Details: [state](../references/runtime-state.md), [messages](../references/host-dispatch.md), [housekeeping](../references/workspace-housekeeping.md).

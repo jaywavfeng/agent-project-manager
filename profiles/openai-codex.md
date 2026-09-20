@@ -1,18 +1,14 @@
 # OpenAI Codex Profile
 
-TAO v0.6.0 preserves the existing model mapping. Availability and routing support must be checked against the current host.
-
-> **Use the cheapest model that is likely to complete the task correctly without costly rework.**
+TAO v0.7.0 preserves the model mapping. Routing capabilities are checked against current host tools.
 
 | Role | Model | Reasoning | Use |
 |---|---|---|---|
-| PROJECT_LEAD | `gpt-5.6-sol` | Extra High (`xhigh`) | Intent, architecture, major decisions, acceptance |
-| WORKER | `gpt-5.6-luna` | Extra High (`xhigh`) | Bounded execution and validation |
-| First escalation / REVIEWER | `gpt-5.6-terra` | `high` or `xhigh` | Luna capability gaps and ordinary independent review |
-| SOL escalation | `gpt-5.6-sol` | `xhigh` | High-risk decisions or Terra remains insufficient |
+| PROJECT_LEAD | `gpt-5.6-sol` | `xhigh` | Intent, decisions, direct execution when cheaper, acceptance |
+| WORKER | `gpt-5.6-luna` | `xhigh` | Sustained bounded implementation and validation |
+| First escalation / REVIEWER | `gpt-5.6-terra` | `high` or `xhigh` | Capability gaps and useful independent review |
+| SOL escalation | `gpt-5.6-sol` | `xhigh` | High-risk decisions or insufficient Terra capability |
 
-[Host dispatch](../references/host-dispatch.md) is the single source for route and messaging rules. Native dispatch explicitly requests the profile's model and reasoning. For Codex task tools these fields are `model` and `thinking`; for subagent hosts they may be `model` and `reasoning_effort`. Effective metadata must establish both requested values before substantive work. Do not infer support from field names or success alone. Current desktop task tool contracts do not supply that attestation, so reuse Owner-created tasks.
+Use [host dispatch](../references/host-dispatch.md). Independent-conversation creation requests both model and reasoning explicitly (host tools may name the latter thinking). Missing effective metadata is unverified; contradictions require correction. Do not silently inherit Lead settings. Automatic subagents are disabled; routing parameters are not billed-usage evidence.
 
-Owner-created top-level Workers and Reviewers preserve their settings. Check only a clearly exposed model family; if unavailable, continue. Never gate manual reasoning: `5.6 Luna / high`, `5.6 Luna / 极高`, and other Luna reasoning settings all continue. For display only, `极高` = `xhigh` and `高` = `high`. Neither a selector nor an effective-route receipt proves billed credits or token savings.
-
-Select one profile and reuse one long-lived Worker where suitable. Model recommendations do not themselves authorize new sidebar tasks or overrides of Owner-created conversations. This release does not change the Lead tier to a newer model merely because one is available.
+Owner-selected conversations preserve their settings. Check only a clearly visible model family; unavailable selectors continue. Never gate manual reasoning. For display, 极高 = xhigh and 高 = high. Model recommendations do not authorize new conversations or unrelated external actions. Real token/credit savings require attributable telemetry.

@@ -1,33 +1,15 @@
 # Lead Coordination
 
-Read for first planning or changes to project direction, not on every Worker continuation.
+Optimize correct completion and total cost, including waiting and rework. Lead can directly implement, diagnose, test and integrate when that is cheaper than delegation. No extra justification document is required. Reuse one economy Worker for sustained bounded work; add independent roles only when useful. Ordinary review is balanced; strong review needs a concrete risk justification.
 
-> **Use the cheapest model that is likely to complete the task correctly without costly rework.**
+Initialize durable state only when a handoff helps. Keep stable goals, constraints and acceptance in PLAN.md. Use context --role lead for continuation, then relevant directives, active tasks/blockers and pending events. Its pagination reports active totals; do not silently ignore relevant omitted work. Read history only for a particular discrepancy. Refresh HANDOFF.md at a meaningful change, not after each command; OWNER_STATUS.md is optional.
 
-## Decide, assign, accept
+Assignments precede messages. Use the selected profile and [host dispatch](host-dispatch.md). Existing authorization persists. After an actual result, verify criteria and continue the authorized next step. Do not ask the Owner to perform routine handoffs when automatic messages work.
 
-The Lead distills intent and stable acceptance criteria into `PLAN.md`. Inspect only entrypoints or evidence needed for that decision. Resolve material unknowns, then delegate bounded execution. PROJECT_LEAD MUST NOT perform routine implementation, tests, SSH checks or `nvidia-smi`; small orchestration commands are permitted. Ask whether an action needs strong reasoning, not whether the Lead could execute it.
+When a Worker stalls, resolve the actual cause. control-worker can resume, cancel or take over after confirmed writer/process quiescence; a timeout is not proof of that. Takeover retains the task and write scope while fencing the old revision. Reassign completed or stopped work honestly. Do not release an input still required by active dependents. Completed historical dependencies do not follow a reused role into a new assignment.
 
-Default to one reusable Worker. A new Worker needs independent useful work, disjoint active write scope, named read dependencies and an integration path. Its benefit must exceed model/context/coordination costs. Completing M1 does not justify creating `worker-2`. Combine sequential small steps with the same context into one assignment.
+Review completion and approval are separate. cancel-review preserves the requirement, lets execution resume, and archives the prior state. New implementation invalidates old review; only a current approved verdict permits required-review completion.
 
-Use the helper through the explicit Python invocation in [SKILL.md](../SKILL.md). The `add-worker` and `reassign-worker` subcommands accept objectives, scopes, dependencies and completion criteria; use their `--help` when needed. Avoid task descriptions such as "do tests" without observable acceptance. Only PROJECT_LEAD reassigns a completed Worker, archiving its old task/status/blocker and resetting the same identity to ready.
+At milestone completion, before completion freeze, or a due substantive continuation, use [housekeeping](workspace-housekeeping.md). This is bounded artifact maintenance, not another audit gate. Skip ambiguous/active files and keep useful work moving. Status-only requests remain read-only. For completed projects, use reopen-project only for actionable changes.
 
-Persist the assignment before applying [host dispatch](host-dispatch.md). That is the single source for actual/effective model attestation, Owner-created routes, messaging and passive waits. No route or billing proof is inferred from successful request acceptance. The economy model must not silently inherit the Lead's model.
-
-Completion is an evidence decision: inspect the relevant result and validation against criteria. A sent message, finished host task, screenshot or passing build alone is not completion. Balanced review is optional where it materially improves confidence; use [escalation and review](escalation-and-review.md) only when needed. Do not retry the same failure without new evidence; escalate the capability gap first to the configured lower-cost tier.
-
-## Resume with no chat history
-
-`$tao continue lead` uses the role context packet, then relevant directives/plan sections and active blockers/events. It must recover final goal, completed work, current position, verified results, durable constraints, blockers, next action and Owner decision. Repair a missing canonical fact at the relevant transition. Historical evidence and source code are read only for a specific discrepancy or decision.
-
-Interpret ambiguous Owner events, write resulting durable direction, then resolve the event. A message does not override repository authority. A repeated or older Worker notification cannot reopen, reassign or accept a task a second time; compare its revision and current status/next action first.
-
-Completed state is frozen for read-only requests. For actionable changes use `reopen-project` with the Owner's reason and a milestone; then `reassign-worker` for a suitable completed Worker. Neither the existence of `.tiered-agent` nor maintenance of TAO activates this protocol without explicit `$tao` invocation.
-
-## Transition-sized reporting
-
-Update a fact once in its canonical location. `HANDOFF.md` compresses the current takeover picture; `OWNER_STATUS.md` is optional human presentation. Neither is a running command log. Update summaries only when their audience's next action, outcome, risk or decision changes.
-
-> **Prefer the simplest mechanism that is sufficiently reliable for the actual failure modes of the project.**
-
-The coordination target is <= 10% of actual-task tokens, using attributable purpose measurements, not Lead-vs-Worker guesses. Without measurements report proxy changes, not savings. Remove repetitive reads, polling and updates before adding infrastructure. No speculative audit/recovery machinery while useful task work is ready.
+Use [state ownership](runtime-state.md) for controls and [escalation](escalation-and-review.md) for unresolved intent. Coordination / actual-task tokens targets 10%; remove repeated reads, reports and polling before adding machinery. Route declarations and document reductions do not prove billing savings.

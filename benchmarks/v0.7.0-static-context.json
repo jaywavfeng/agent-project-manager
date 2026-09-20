@@ -1,0 +1,68 @@
+{
+  "kind": "static-context-proxy",
+  "baseline_commit": "204002a817866d3ba652ab790ecb103ae538fb63",
+  "method": "UTF-8 text, str.split word counts, normalized synthetic context packets; not model tokens",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "before_words": 1157,
+      "after_words": 790
+    },
+    {
+      "path": "references/orchestration-protocol.md",
+      "before_words": 547,
+      "after_words": 334
+    },
+    {
+      "path": "references/runtime-state.md",
+      "before_words": 792,
+      "after_words": 537
+    },
+    {
+      "path": "references/host-dispatch.md",
+      "before_words": 1141,
+      "after_words": 826
+    },
+    {
+      "path": "profiles/openai-codex.md",
+      "before_words": 286,
+      "after_words": 177
+    }
+  ],
+  "conditional_housekeeping_reference_words": 670,
+  "context_cases": [
+    {
+      "active_workers": 1,
+      "terminal_workers": 0,
+      "before": {
+        "utf8_bytes": 1827,
+        "words_proxy": 185
+      },
+      "after": {
+        "utf8_bytes": 2036,
+        "words_proxy": 203
+      }
+    },
+    {
+      "active_workers": 1,
+      "terminal_workers": 100,
+      "before": {
+        "utf8_bytes": 301421,
+        "words_proxy": 41685
+      },
+      "after": {
+        "utf8_bytes": 2038,
+        "words_proxy": 203
+      }
+    }
+  ],
+  "documented_success_path_calls": {
+    "includes": "state result write, packet preparation, host sends and receipts; excludes shared assignment/binding/observation work",
+    "before": 7,
+    "after_with_combined_callback": 6,
+    "kind": "protocol-step count, not live-host telemetry"
+  },
+  "actual_coordination_token_ratio": null,
+  "actual_token_target_verified": false,
+  "live_host_dispatch_verified": false
+}
