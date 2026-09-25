@@ -27,9 +27,9 @@ jobs:
           python scripts/statectl.py --help
           python scripts/statectl.py context --help
           python scripts/statectl.py bind-thread --help
-          python scripts/statectl.py dispatch-context --help
-          python scripts/statectl.py record-dispatch --help
-          python scripts/statectl.py notification-context --help
+          python scripts/statectl.py status-refresh --help
+          python scripts/statectl.py memory-add --help
+          python scripts/statectl.py memory-consolidate --help
           python scripts/benchmark.py --help
           python scripts/benchmark.py overhead --help
           python scripts/statectl.py control-worker --help
