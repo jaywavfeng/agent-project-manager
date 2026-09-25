@@ -23,7 +23,7 @@ Otherwise keep it. Delegating a task you cannot describe is how coordination cos
 
 ## Recording a refusal
 
-When you keep a task that a reader might expect to be delegated, note the reason in one line in `PLAN.md` or `HANDOFF.md`. Do not write an essay. `"Kept: root cause unknown, needs interactive debugging"` is enough.
+When you keep a task that a reader might expect to be delegated, note the reason in one line in `PLAN.md`. Do not write an essay. `"Kept: root cause unknown, needs interactive debugging"` is enough.
 
 ## Cost
 

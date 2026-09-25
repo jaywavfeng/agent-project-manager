@@ -360,13 +360,9 @@ def validate_completion_history(runtime: Path, project_id: str) -> list[str]:
         if not entry.is_dir() or match is None:
             errors.append(f"{entry}: invalid completion history entry")
             continue
-        for name in (
-            "STATE.json",
-            "PLAN.md",
-            "OWNER_DIRECTIVES.md",
-            "HANDOFF.md",
-            "REOPEN.json",
-        ):
+        # STATE.json and REOPEN.json are always archived; the human pages and the
+        # review snapshot are present only when the project actually had them.
+        for name in ("STATE.json", "REOPEN.json"):
             if not (entry / name).is_file():
                 errors.append(f"{entry}: missing completion snapshot {name}")
         archived_state_path = entry / "STATE.json"
@@ -420,7 +416,8 @@ def validate_completion_history(runtime: Path, project_id: str) -> list[str]:
                 except StateError:
                     pass
         review = archived_state.get("review")
-        if isinstance(review, dict):
+        # Only an assigned review has files worth snapshotting.
+        if isinstance(review, dict) and review.get("required"):
             for key in ("task_path", "status_path", "report_path"):
                 try:
                     target = checked_relative_path(entry, review.get(key), f"completion.review.{key}")
@@ -454,12 +451,9 @@ def validate_completion_history(runtime: Path, project_id: str) -> list[str]:
 
 def validate_runtime(runtime: Path, *, include_history: bool = True) -> list[str]:
     errors: list[str] = []
-    for name in ("STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md", "memory.jsonl"):
+    for name in ("STATE.json", "memory.jsonl"):
         if not (runtime / name).is_file():
             errors.append(f"Missing required file: {runtime / name}")
-    for name in ("workers", "inbox/owner", "review"):
-        if not (runtime / name).is_dir():
-            errors.append(f"Missing required directory: {runtime / name}")
     if errors:
         return errors
 
@@ -467,6 +461,19 @@ def validate_runtime(runtime: Path, *, include_history: bool = True) -> list[str
         state = load_state(runtime)
     except StateError as exc:
         return [str(exc)]
+
+    # Conditional files and directories exist only once the feature is in use, so
+    # a standalone project stays at three files. Each check reads the state that
+    # was just loaded; a missing directory for an unused feature is not an error.
+    if state.get("workers") and not (runtime / "workers").is_dir():
+        errors.append(f"Missing required directory: {runtime / 'workers'}")
+    if state.get("review", {}).get("required") and not (runtime / "review").is_dir():
+        errors.append(f"Missing required directory: {runtime / 'review'}")
+    for entry in state.get("workers", []):
+        for key in ("task_path", "status_path"):
+            relative = entry.get(key)
+            if relative and not (runtime / relative).is_file():
+                errors.append(f"Missing required file: {runtime / relative}")
 
     required = {
         "schema_version",
@@ -643,7 +650,9 @@ def validate_runtime(runtime: Path, *, include_history: bool = True) -> list[str
             except StateError as exc:
                 errors.append(str(exc))
                 continue
-            if not target.is_file():
+            # Review files are created by `assign-review`, so an unused review
+            # legitimately has none of them on disk.
+            if review["required"] and not target.is_file():
                 errors.append(f"Missing review file: {target}")
         try:
             review_status_path = checked_relative_path(runtime, review["status_path"], "review.status_path")
@@ -698,22 +707,42 @@ def assert_valid(runtime: Path) -> None:
 
 
 def validate_candidate(runtime: Path, changes: dict[str, str]) -> None:
-    """Validate current files plus a proposed write set, without copying history."""
+    """Validate current files plus a proposed write set, without copying history.
+
+    A minimal standalone runtime holds only ``STATE.json``, ``memory.jsonl`` and
+    ``PROJECT_STATUS.md``; every other file is created on demand. The candidate
+    therefore mirrors whatever the live runtime actually has, rather than a
+    fixed list of files.
+    """
     with tempfile.TemporaryDirectory(prefix="apm-candidate-") as directory:
         candidate = Path(directory)
         state = load_state(runtime)
-        paths = {"STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md", "memory.jsonl",
-                 "review/TASK.md", "review/STATUS.json", "review/REPORT.md"}
+        paths = {"STATE.json", "memory.jsonl"}
+        for name in ("PROJECT_STATUS.md", "PLAN.md", "OWNER_DIRECTIVES.md", "OWNER_STATUS.md",
+                     "HANDOFF.md"):
+            if (runtime / name).is_file():
+                paths.add(name)
+        if state["review"]["required"] or (runtime / "review").is_dir():
+            paths.update(("review/TASK.md", "review/STATUS.json", "review/REPORT.md"))
         for entry in state["workers"]:
             paths.update((entry["task_path"], entry["status_path"],
                           str(PurePosixPath(entry["task_path"]).parent / "BLOCKER.md")))
-        for name in ("workers", "inbox/owner", "review"):
-            (candidate / name).mkdir(parents=True, exist_ok=True)
-        for name in paths | set(changes):
+        for name in sorted(paths | set(changes)):
             target = candidate / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(changes[name] if name in changes else
-                              (runtime / name).read_text(encoding="utf-8"), encoding="utf-8")
+            source = runtime / name
+            if name in changes:
+                content = changes[name]
+            elif source.is_file():
+                content = source.read_text(encoding="utf-8")
+            else:
+                content = None
+            if content is not None:
+                target.write_text(content, encoding="utf-8")
+            elif target.suffix == ".md":
+                target.write_text("", encoding="utf-8")
+        for name in ("workers", "inbox/owner", "review"):
+            (candidate / name).mkdir(parents=True, exist_ok=True)
         assert_valid(candidate)
 
 
@@ -734,10 +763,6 @@ def command_init(args: argparse.Namespace) -> int:
         raise StateError(f"Project root does not exist or is not a directory: {root}")
     staging = Path(tempfile.mkdtemp(prefix=f"{RUNTIME_NAME}.init-", dir=root))
     try:
-        (staging / "workers").mkdir()
-        (staging / "inbox" / "owner").mkdir(parents=True)
-        (staging / "review").mkdir()
-
         now = utc_now()
         state = read_template_json("STATE.json")
         state["project_id"] = args.project_id
@@ -747,24 +772,9 @@ def command_init(args: argparse.Namespace) -> int:
         write_new_json(state_path(staging), state)
         write_new_text(staging / "memory.jsonl", "")
 
-        replacements = {"{{PROJECT_ID}}": args.project_id, "{{MODE}}": args.mode,
-                        "{{UPDATED}}": now}
-        for source, destination in (
-            ("PLAN.md", staging / "PLAN.md"),
-            ("OWNER_DIRECTIVES.md", staging / "OWNER_DIRECTIVES.md"),
-            ("HANDOFF.md", staging / "HANDOFF.md"),
-            ("OWNER_STATUS.md", staging / "OWNER_STATUS.md"),
-            ("review-task.md", staging / "review" / "TASK.md"),
-            ("review-report.md", staging / "review" / "REPORT.md"),
-        ):
-            content = read_template_text(source)
-            for old, new in replacements.items():
-                content = content.replace(old, new)
-            write_new_text(destination, content)
-
-        review_status = read_template_json("review-status.json")
-        review_status["last_updated"] = now
-        write_new_json(staging / "review" / "STATUS.json", review_status)
+        # The manager must cost less than the work it saves: initialize only the
+        # three files every project needs. PLAN.md, workers/, review/ and
+        # inbox/owner/ are created by the command that first needs them.
         assert_valid(staging)
         # Render the human page from real state rather than shipping placeholders.
         write_new_text(
@@ -1002,6 +1012,8 @@ def command_add_worker(args: argparse.Namespace) -> int:
     worker_dir = runtime / "workers" / args.worker_id
     if worker_dir.exists():
         raise StateError(f"Refusing to overwrite existing Worker directory: {worker_dir}")
+    # Workers are opt-in: the directory only appears once a Worker is registered.
+    (runtime / "workers").mkdir(parents=True, exist_ok=True)
     old_state_text = state_path(runtime).read_text(encoding="utf-8")
     status = read_template_json("worker-status.json")
     status["worker_id"] = args.worker_id
@@ -1275,11 +1287,12 @@ def command_reassign_worker(args: argparse.Namespace) -> int:
                 f"Write scope overlaps with {other_id}: {', '.join(overlap)}"
             )
 
-    review_status = read_json(runtime / "review" / "STATUS.json")
+    review_status_file = runtime / "review" / "STATUS.json"
+    review_status = read_json(review_status_file) if review_status_file.is_file() else {}
     if (
         state["review"]["required"]
         and state["review"]["reviewer_id"] is not None
-        and review_status["status"] != "completed"
+        and review_status.get("status") != "completed"
     ):
         raise StateError("Cannot return to execution while the assigned review is unfinished")
 
@@ -1442,9 +1455,11 @@ def archive_project_completion(runtime: Path, reason: str) -> int:
         tempfile.mkdtemp(prefix=f".completion-{revision:04d}-", dir=history_dir)
     )
     try:
-        for name in ("STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md", "memory.jsonl"):
+        for name in ("STATE.json", "memory.jsonl"):
             write_new_text(temporary / name, (runtime / name).read_text(encoding="utf-8"))
-        for name in ("OWNER_STATUS.md", "PROJECT_STATUS.md"):
+        for name in ("PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md",
+                     "OWNER_STATUS.md", "PROJECT_STATUS.md"):
+            # Absent for a minimal standalone project; archive only what exists.
             optional = runtime / name
             if optional.is_file():
                 write_new_text(temporary / name, optional.read_text(encoding="utf-8"))
@@ -1464,9 +1479,11 @@ def archive_project_completion(runtime: Path, reason: str) -> int:
             )
         for key in ("task_path", "status_path", "report_path"):
             source = checked_relative_path(runtime, state["review"][key], f"review.{key}")
-            write_new_text(
-                temporary / source.relative_to(runtime), source.read_text(encoding="utf-8")
-            )
+            # Review files only exist once a review has been assigned.
+            if source.is_file():
+                write_new_text(
+                    temporary / source.relative_to(runtime), source.read_text(encoding="utf-8")
+                )
         write_new_json(
             temporary / "REOPEN.json",
             {
@@ -1544,11 +1561,12 @@ def require_completion_ready(runtime: Path, state: dict[str, Any]) -> None:
     if pending_owner_events(runtime):
         raise StateError("Cannot complete project while Owner feedback is pending")
     if state["review"]["required"]:
-        review_status = read_json(runtime / "review" / "STATUS.json")
+        review_status_file = runtime / "review" / "STATUS.json"
+        review_status = read_json(review_status_file) if review_status_file.is_file() else {}
         if (
             state["review"]["reviewer_id"] is None
-            or review_status["status"] != "completed"
-            or review_status["reviewer_id"] != state["review"]["reviewer_id"]
+            or review_status.get("status") != "completed"
+            or review_status.get("reviewer_id") != state["review"]["reviewer_id"]
             or review_status.get("verdict") != "approved"
         ):
             raise StateError("Cannot complete project; required review is unfinished or stale, or not approved")
@@ -1574,11 +1592,12 @@ def command_set_project(args: argparse.Namespace) -> int:
     ):
         raise StateError("Cannot enter review phase without an assigned review")
     if state["phase"] == "review" and phase == "execution":
-        review_status = read_json(runtime / "review" / "STATUS.json")
+        review_status_file = runtime / "review" / "STATUS.json"
+        review_status = read_json(review_status_file) if review_status_file.is_file() else {}
         if (
             state["review"]["reviewer_id"] is None
-            or review_status["reviewer_id"] != state["review"]["reviewer_id"]
-            or review_status["status"] != "completed"
+            or review_status.get("reviewer_id") != state["review"]["reviewer_id"]
+            or review_status.get("status") != "completed"
         ):
             raise StateError("Cannot leave review for execution while review is unfinished")
         state["review"]["reviewer_id"] = None
@@ -1687,15 +1706,23 @@ def validate_review_assignment_marker(value: dict[str, Any], path: Path) -> None
             raise StateError(f"Invalid {key} in pending review marker: {path}")
         if not all(isinstance(content, str) for content in files.values()):
             raise StateError(f"Invalid {key} content in pending review marker: {path}")
+    # A first assignment rewrites nothing, so old_files may hold empty strings;
+    # only a non-empty prior status has to parse as a valid review status.
+    if value["old_files"]["STATUS.json"]:
+        try:
+            old_status = json.loads(value["old_files"]["STATUS.json"])
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise StateError(f"Invalid status JSON in pending review marker: {path}") from exc
+        if not isinstance(old_status, dict):
+            raise StateError(f"Invalid status object in pending review marker: {path}")
+        if validate_review_status(old_status, path):
+            raise StateError(f"Invalid archived review: {path}")
     try:
-        old_status = json.loads(value["old_files"]["STATUS.json"])
         new_status = json.loads(value["new_files"]["STATUS.json"])
     except (json.JSONDecodeError, TypeError) as exc:
         raise StateError(f"Invalid status JSON in pending review marker: {path}") from exc
-    if not isinstance(old_status, dict) or not isinstance(new_status, dict):
+    if not isinstance(new_status, dict):
         raise StateError(f"Invalid status object in pending review marker: {path}")
-    if validate_review_status(old_status, path):
-        raise StateError(f"Invalid archived review: {path}")
     if validate_review_status(new_status, path) or (
         new_status.get("reviewer_id") != value["reviewer_id"]
         or new_status.get("status") != "ready"
@@ -1708,7 +1735,8 @@ def recover_review_assignment(runtime: Path, marker_path: Path) -> None:
     validate_review_assignment_marker(marker, marker_path)
     review_dir = runtime / "review"
     for name in ("TASK.md", "STATUS.json", "REPORT.md"):
-        current = (review_dir / name).read_text(encoding="utf-8")
+        target = review_dir / name
+        current = target.read_text(encoding="utf-8") if target.is_file() else ""
         if current not in {marker["old_files"][name], marker["new_files"][name]}:
             raise StateError(
                 f"Pending review assignment conflicts with newer review/{name}; "
@@ -1766,11 +1794,12 @@ def command_assign_review(args: argparse.Namespace) -> int:
     state = load_state(runtime)
     if state["status"] == "complete":
         raise StateError("Cannot assign review to a completed project")
-    current_status = read_json(runtime / "review" / "STATUS.json")
+    current_status_path = runtime / "review" / "STATUS.json"
+    current_status = read_json(current_status_path) if current_status_path.is_file() else {}
     if (
         state["review"]["required"]
         and state["review"]["reviewer_id"] is not None
-        and current_status["status"] not in {"completed", "not-requested"}
+        and current_status.get("status", "not-requested") not in {"completed", "not-requested"}
     ):
         raise StateError("A review assignment is already active")
     unfinished_workers = []
@@ -1806,8 +1835,16 @@ def command_assign_review(args: argparse.Namespace) -> int:
         }
     )
     review_dir = runtime / "review"
+    # Reviews are opt-in: the directory only appears once a review is assigned.
+    review_dir.mkdir(parents=True, exist_ok=True)
+    # A first assignment has no previous files; the recovery marker records the
+    # empty string so a crash mid-assignment still restores a known state.
     old_files = {
-        name: (review_dir / name).read_text(encoding="utf-8")
+        name: (
+            (review_dir / name).read_text(encoding="utf-8")
+            if (review_dir / name).is_file()
+            else ""
+        )
         for name in ("TASK.md", "STATUS.json", "REPORT.md")
     }
     marker = {
@@ -1816,7 +1853,7 @@ def command_assign_review(args: argparse.Namespace) -> int:
         "level": args.level,
         "archive_revision": (
             max(review_history_revisions(runtime), default=0) + 1
-            if current_status["status"] == "completed"
+            if current_status.get("status") == "completed"
             else None
         ),
         "old_files": old_files,
@@ -2006,8 +2043,10 @@ def status_snapshot(runtime: Path, *, validate: bool = True) -> dict[str, Any]:
                 "next_action": status["next_action"],
             }
         )
-    review_status = read_json(runtime / "review" / "STATUS.json")
     review_assigned = state["review"]["reviewer_id"] is not None
+    # review/STATUS.json only exists once a review has actually been assigned.
+    review_status_path = runtime / "review" / "STATUS.json"
+    review_status = read_json(review_status_path) if review_status_path.is_file() else {}
     return {
         "project_id": state["project_id"],
         "mode": state["mode"],
@@ -2019,9 +2058,9 @@ def status_snapshot(runtime: Path, *, validate: bool = True) -> dict[str, Any]:
             "required": state["review"]["required"],
             "level": state["review"]["level"],
             "reviewer_id": state["review"]["reviewer_id"],
-            "status": review_status["status"] if review_assigned else "not-assigned",
+            "status": review_status.get("status", "not-requested") if review_assigned else "not-assigned",
             "summary": (
-                review_status["summary"]
+                review_status.get("summary", "")
                 if review_assigned
                 else ("Review is required but not assigned." if state["review"]["required"] else "")
             ),
@@ -2058,14 +2097,12 @@ def render_status(snapshot: dict[str, Any]) -> str:
         )
     )
     lines.append(f"Pending Owner feedback: {snapshot['pending_owner_feedback']}")
-    lines.append(
-        "Owner summary: "
-        + (
-            f".agent-project-manager/{snapshot['owner_status']}"
-            if snapshot["owner_status"]
-            else "not created yet; create it at the next meaningful transition"
-        )
-    )
+    # PROJECT_STATUS.md is the human page in v1.1; OWNER_STATUS.md is a legacy
+    # variant that is only mentioned when a pre-v1.1 project still carries one.
+    if snapshot["project_status"]:
+        lines.append(f"Human page: .agent-project-manager/{snapshot['project_status']}")
+    if snapshot["owner_status"]:
+        lines.append(f"Owner summary: .agent-project-manager/{snapshot['owner_status']}")
     next_action = snapshot["next_action"]
     lines.append(f"Next: {next_action['actor']} — {next_action['instruction']}")
     return "\n".join(lines)
@@ -2125,6 +2162,77 @@ def render_project_status(runtime: Path, snapshot: dict[str, Any]) -> str:
     next_action = snapshot["next_action"]
     lines += [f"## {bilingual('下一步', 'Next step')}", "",
               f"{next_action['actor']} — {next_action['instruction']}", ""]
+    return "\n".join(lines)
+
+
+def synthesize_handoff(
+    runtime: Path, state: dict[str, Any], snapshot: dict[str, Any]
+) -> str:
+    """Build a cold-start briefing from files that already exist.
+
+    v1.1 removed HANDOFF.md: it duplicated STATE.json, memory.jsonl and PLAN.md,
+    and a duplicated hand-written summary is exactly the kind of state that goes
+    stale. This renders the same information on demand instead, so a fresh Lead
+    conversation can still pick the project up with no prior chat.
+    """
+    from memory import read_entries
+
+    entries = read_entries(runtime) if (runtime / "memory.jsonl").is_file() else []
+
+    def texts(kinds: set[str]) -> list[str]:
+        return [entry["text"] for entry in entries if entry["kind"] in kinds]
+
+    goals = texts({"human-intent"})
+    directions = texts({"direction"})
+    decisions = texts({"decision", "rejected"})
+    constraints = texts({"constraint"})
+    questions = texts({"open-question"})
+
+    lines = [
+        "# Handoff",
+        "",
+        "## Final goal / 最终目标",
+    ]
+    lines += [f"- {text}" for text in goals] or ["- (Not recorded yet.)"]
+    if directions:
+        lines += ["", "## Direction / 方向"] + [f"- {text}" for text in directions]
+    lines += [
+        "",
+        "## Current position / 当前位置",
+        f"- Phase: {state['phase']} · Status: {state['status']} · Mode: {state['mode']}",
+        f"- Milestone: {state['current_milestone']}",
+    ]
+
+    completed = [w for w in snapshot["workers"] if w["status"] in {"completed", "inactive"}]
+    active = [w for w in snapshot["workers"] if w["status"] in ACTIVE_WORKER_STATUSES]
+    if completed:
+        lines += ["", "## Completed / 已完成"]
+        lines += [f"- {w['id']}: {w['summary'] or w['status']}" for w in completed]
+    if active:
+        lines += ["", "## Active roles / 进行中的角色"]
+        lines += [f"- {w['id']}: {w['status']} — {w['next_action'] or w['summary']}" for w in active]
+    if not snapshot["workers"]:
+        lines += ["", "## Active roles / 进行中的角色", "- None; standalone mode runs in one conversation."]
+
+    if decisions:
+        lines += ["", "## Important decisions / 重要决策"]
+        lines += [f"- {text}" for text in decisions]
+    if constraints:
+        lines += ["", "## Constraints / 约束"]
+        lines += [f"- {text}" for text in constraints]
+    if questions:
+        lines += ["", "## Open questions / 待确认"]
+        lines += [f"- {text}" for text in questions]
+
+    plan_path = runtime / "PLAN.md"
+    if plan_path.is_file():
+        lines += ["", "## Plan / 计划", f"- Read {plan_path}."]
+    lines += [
+        "",
+        "## Next action / 下一步",
+        f"- {state['next_action']['actor']} — {state['next_action']['instruction']}",
+        "",
+    ]
     return "\n".join(lines)
 
 

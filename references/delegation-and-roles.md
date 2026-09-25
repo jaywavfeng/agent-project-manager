@@ -34,7 +34,7 @@ Concrete model names live only in the selected profile ([generic](../profiles/ge
 
 Optimize correct completion and total cost, including waiting and rework. A strong leader can directly implement, diagnose, test and integrate when that is cheaper than delegation. No extra justification document is required.
 
-Initialize durable state only when a handoff helps. Keep stable goals, constraints and acceptance in `PLAN.md`, and durable user requirements in project memory. Use `context --role lead` for continuation, then relevant directives, active tasks/blockers and pending events. Its pagination reports active totals; do not silently ignore relevant omitted work. Read history only for a particular discrepancy. Refresh `HANDOFF.md` at a meaningful change, not after each command.
+Initialize durable state only when a handoff helps. Keep stable goals, constraints and acceptance in `PLAN.md`, and durable user requirements in project memory. Use `context --role lead` for continuation, then relevant directives, active tasks/blockers and pending events. Its pagination reports active totals; do not silently ignore relevant omitted work. Read history only for a particular discrepancy. A cold start reads state, memory and the plan directly; there is no handoff file to keep in sync.
 
 Assignments precede messages. Use the selected profile and [host dispatch](host-dispatch.md). Existing authorization persists. After an actual result, verify criteria and continue the authorized next step. Do not ask the Owner to perform routine handoffs when automatic messages work.
 

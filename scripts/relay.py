@@ -199,8 +199,15 @@ def command_context(args, api):
         result["status"] = snapshot
         result["worker_page"] = {"active_total": len(active), "terminal_total": terminal,
                                  "offset": offset, "next_offset": offset + limit if offset + limit < len(active) else None}
-        result["handoff"] = (runtime / "HANDOFF.md").read_text(encoding="utf-8")
-        result["plan_path"] = str(runtime / "PLAN.md")
+        # HANDOFF.md is gone in v1.1: a cold-start briefing is synthesized from the
+        # files that already exist, so nothing has to be kept in sync by hand.
+        legacy_handoff = runtime / "HANDOFF.md"
+        result["handoff"] = (
+            legacy_handoff.read_text(encoding="utf-8")
+            if legacy_handoff.is_file()
+            else api.synthesize_handoff(runtime, state, snapshot)
+        )
+        result["plan_path"] = str(runtime / "PLAN.md") if (runtime / "PLAN.md").is_file() else None
         events = api.pending_owner_events(runtime)
         result["pending_events"] = [str(p) for p in events[offset:offset + limit]]
         result["event_page"] = {"total": len(events), "next_offset": offset + limit if offset + limit < len(events) else None}

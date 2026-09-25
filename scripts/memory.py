@@ -159,14 +159,26 @@ def command_memory_consolidate(args, api) -> int:
             seen.add(key)
             keep.append(entry)
     if len(keep) > args.keep:
-        dropped = keep[: len(keep) - args.keep] + dropped
-        keep = keep[len(keep) - args.keep:]
+        # User intent and constraints are never archived. They are requirements an
+        # agent must not silently drop, and because read_entries only reads
+        # memory.jsonl, archiving one would make it invisible to `relevant()`
+        # forever. Only the surplus of these kinds is exempted from the cap, so a
+        # project with many constraints keeps a larger active file by design
+        # rather than losing its requirements.
+        protected_kinds = {"human-intent", "constraint"}
+        drop_count = len(keep) - args.keep
+        archivable = [entry for entry in keep if entry["kind"] not in protected_kinds]
+        to_drop = {id(entry) for entry in archivable[:drop_count]}
+        dropped = [entry for entry in keep if id(entry) in to_drop] + dropped
+        keep = [entry for entry in keep if id(entry) not in to_drop]
     if not dropped:
         print(f"Memory already consolidated: {len(keep)} entries")
         return 0
+    protected = [entry for entry in keep if entry["kind"] in {"human-intent", "constraint"}]
     if not args.apply:
         print(json.dumps({"would_archive": [entry["id"] for entry in dropped],
-                          "remaining": len(keep)}, ensure_ascii=False, indent=2))
+                          "remaining": len(keep),
+                          "protected": len(protected)}, ensure_ascii=False, indent=2))
         print("Preview only; pass --apply to rewrite memory.jsonl and append the archive")
         return 0
     existing = ""
@@ -179,7 +191,8 @@ def command_memory_consolidate(args, api) -> int:
     )
     api.atomic_write_text(path, (existing or ARCHIVE_HEADER) + block)
     write_entries(runtime, keep)
-    print(f"Archived {len(dropped)} entries; {len(keep)} remain active")
+    print(f"Archived {len(dropped)} entries; {len(keep)} remain active"
+          f" ({len(protected)} protected intent/constraint entries kept)")
     return 0
 
 

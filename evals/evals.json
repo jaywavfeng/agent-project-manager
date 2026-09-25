@@ -169,7 +169,7 @@
       "prompt": "$apm continue lead. This is a new Codex account and the conversation has no prior messages; continue the existing project from the repository only.",
       "expected_output": "The new Project Lead reconstructs the final goal, completed work, current position, role states, decisions, evidence, blockers, next action, and Owner-decision need from the bounded repository state set without asking for a chat recap.",
       "assertions": [
-        "STATE.json and HANDOFF.md are read first.",
+        "STATE.json and memory.jsonl are read first, then PLAN.md when it exists.",
         "Only relevant PLAN.md sections, current directives, active role status, blockers, and pending Owner events are then loaded.",
         "The Owner is not asked to copy or summarize previous conversation history.",
         "Code, diffs, and archives are read only for a specific discrepancy."
@@ -180,7 +180,7 @@
       "prompt": "$apm status. I am the Owner and want a quick project-manager overview, not a technical command log.",
       "expected_output": "The agent points the Owner to PROJECT_STATUS.md and keeps it as a concise bilingual human summary of purpose, major completed outcomes, current phase/results, risks, in-progress work, next steps, and decisions needed.",
       "assertions": [
-        "PROJECT_STATUS.md is the human-facing page, distinct from machine state and HANDOFF.md.",
+        "PROJECT_STATUS.md is the human-facing page, distinct from machine state and internal agent mechanics.",
         "The report avoids terminal history and low-level file lists.",
         "It is refreshed from state only when the Owner-visible picture changes."
       ]

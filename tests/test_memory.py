@@ -95,6 +95,55 @@ class MemoryTests(unittest.TestCase):
     def test_consolidate_on_empty_memory_is_a_no_op(self):
         self.assertIn("empty", self.cli("memory-consolidate", "--apply"))
 
+    def test_consolidate_never_archives_intent_or_constraint(self):
+        """Long-lived human intent and constraints survive any retention window.
+
+        They are requirements an agent must not silently drop, and since
+        read_entries only reads memory.jsonl, archiving one would hide it from
+        relevant() forever.
+        """
+        self.add("human-intent", "Ship a verified offline import pipeline")
+        self.add("constraint", "Never require network access")
+        for index in range(10):
+            self.add("lesson", f"Observation {index}")
+
+        output = self.cli("memory-consolidate", "--keep", "2")
+        preview = json.loads(output[: output.rindex("}") + 1])
+        # 12 entries, cap 2, but the two protected entries are exempt from the cap.
+        self.assertEqual(preview["remaining"], 2)
+        self.assertEqual(preview["protected"], 2)
+        self.cli("memory-consolidate", "--keep", "2", "--apply")
+
+        remaining = [json.loads(line) for line in
+                     (self.runtime / "memory.jsonl").read_text(
+                         encoding="utf-8").splitlines() if line]
+        kinds = {entry["kind"] for entry in remaining}
+        self.assertIn("human-intent", kinds)
+        self.assertIn("constraint", kinds)
+        archive = (self.runtime / "memory-archive.md").read_text(encoding="utf-8")
+        self.assertNotIn("Ship a verified offline import pipeline", archive)
+        self.assertNotIn("Never require network access", archive)
+
+        # A constraint cannot be pushed out even by a flood of newer entries.
+        for index in range(30):
+            self.add("lesson", f"Later observation {index}")
+        self.cli("memory-consolidate", "--keep", "1", "--apply")
+        kept = (self.runtime / "memory.jsonl").read_text(encoding="utf-8")
+        self.assertIn("Never require network access", kept)
+        self.assertIn("Ship a verified offline import pipeline", kept)
+
+    def test_protected_entries_still_reach_relevant_selection(self):
+        self.add("human-intent", "Ship a verified offline import pipeline")
+        self.add("constraint", "Never require network access")
+        for index in range(10):
+            self.add("lesson", f"Unrelated observation {index}")
+        self.cli("memory-consolidate", "--keep", "1", "--apply")
+        output = self.cli("memory-show", "--task", "unrelated cleanup")
+        entries = json.loads(output[: output.rindex("}") + 1])["entries"]
+        texts = {entry["text"] for entry in entries}
+        self.assertIn("Ship a verified offline import pipeline", texts)
+        self.assertIn("Never require network access", texts)
+
     def test_validation_rejects_memory_missing_from_runtime(self):
         (self.runtime / "memory.jsonl").unlink()
         self.assertIn("memory.jsonl", self.cli("validate", code=1))

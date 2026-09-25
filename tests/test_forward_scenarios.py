@@ -131,8 +131,8 @@ class ForwardScenarioTests(unittest.TestCase):
             "## Decision needed\nChoose cache fallback A or B.\n",
             encoding="utf-8",
         )
-        (runtime / "HANDOFF.md").write_text(
-            "# Lead Handoff\n\n## Final goal\nShip a verified offline import pipeline.\n\n"
+        (runtime / "PLAN.md").write_text(
+            "# Plan: Ship a verified offline import pipeline\n\n"
             "## Current position\nVendor integration is blocked after parser completion.\n\n"
             "## Completed\nParser and caller migration.\n\n## Active roles\nworker-1 is blocked.\n\n"
             "## Verified results\n137 tests passed.\n\n## Important decisions and constraints\n"
@@ -147,18 +147,23 @@ class ForwardScenarioTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-        # Simulate a fresh account: reconstruction reads repository files only.
+        # Simulate a fresh account: v1.1 synthesizes the takeover briefing from the
+        # canonical files, so reconstruction reads repository files only.
+        handoff = self.run_cli("context", "--role", "lead").stdout
+        self.assertIn("Final goal", handoff)
+        self.assertIn("Next action", handoff)
+        self.assertFalse((runtime / "HANDOFF.md").exists())
+
         repository_context = "\n".join(
             path.read_text(encoding="utf-8")
             for path in (
                 runtime / "STATE.json",
-                runtime / "HANDOFF.md",
-                runtime / "OWNER_DIRECTIVES.md",
+                runtime / "memory.jsonl",
                 runtime / "PLAN.md",
                 runtime / "workers" / "worker-1" / "STATUS.json",
                 blocker,
             )
-        )
+        ) + handoff
         for fact in (
             "Ship a verified offline import pipeline",
             "Parser and caller migration",
@@ -261,12 +266,11 @@ class ForwardScenarioTests(unittest.TestCase):
         self.run_cli("validate")
         minimal_files = [
             runtime / "STATE.json",
-            runtime / "OWNER_DIRECTIVES.md",
             runtime / "workers" / "worker-2" / "TASK.md",
             runtime / "workers" / "worker-2" / "STATUS.json",
         ]
         self.assertTrue(all(path.is_file() for path in minimal_files))
-        task = minimal_files[2].read_text(encoding="utf-8")
+        task = minimal_files[1].read_text(encoding="utf-8")
         self.assertIn("worker-1", task)
         self.assertNotIn("previous conversation", task.lower())
 

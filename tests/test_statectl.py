@@ -132,31 +132,25 @@ class StateCtlTests(unittest.TestCase):
         self.assertFalse((self.root / ".agent-project-manager").exists())
         self.assertEqual(self.init(), self.root / ".agent-project-manager")
 
-    def test_owner_status_is_created_human_owned_and_legacy_optional(self) -> None:
+    def test_init_creates_only_the_three_minimal_files(self) -> None:
+        """The manager must cost less than the work it saves: three files, nothing else."""
         runtime = self.init()
-        owner_status = runtime / "OWNER_STATUS.md"
-        self.assertTrue(owner_status.is_file())
-        self.assertIn(
-            "# Owner Status: sample-project",
-            owner_status.read_text(encoding="utf-8"),
+        self.assertEqual(
+            sorted(path.name for path in runtime.iterdir()),
+            ["PROJECT_STATUS.md", "STATE.json", "memory.jsonl"],
         )
-        result, output, error = self.run_cli("status")
-        self.assertEqual(result, 0, error)
-        self.assertIn("Owner summary: .agent-project-manager/OWNER_STATUS.md", output)
-
-        # Lead-written human presentation is deliberately not a second parsed state schema.
-        owner_status.write_text(
-            "# Owner Status\n\nA concise Owner-written presentation remains valid.\n",
-            encoding="utf-8",
-        )
+        # Everything else appears only when a command first needs it.
+        for name in ("PLAN.md", "OWNER_STATUS.md", "OWNER_DIRECTIVES.md", "HANDOFF.md",
+                     "workers", "review", "inbox"):
+            self.assertFalse((runtime / name).exists(), name)
         self.assertEqual(self.run_cli("validate")[0], 0)
 
-        # Schema-v1 runtimes created before v0.5.0 remain valid without migration.
-        owner_status.unlink()
-        self.assertEqual(self.run_cli("validate")[0], 0)
+        # The bilingual human page is the human-facing entry point.
+        page = (runtime / "PROJECT_STATUS.md").read_text(encoding="utf-8")
+        self.assertIn("# Project Status: sample-project", page)
         result, output, error = self.run_cli("status")
         self.assertEqual(result, 0, error)
-        self.assertIn("Owner summary: not created yet", output)
+        self.assertIn("PROJECT_STATUS.md", output)
 
     def test_worker_registration_status_and_summary(self) -> None:
         runtime = self.init()
@@ -224,11 +218,8 @@ class StateCtlTests(unittest.TestCase):
         self.assertFalse(review["required"])
         self.assertEqual(review["level"], "none")
         self.assertIsNone(review["reviewer_id"])
-        status = json.loads(
-            (runtime / "review" / "STATUS.json").read_text(encoding="utf-8")
-        )
-        self.assertIsNone(status["reviewer_id"])
-        self.assertEqual(status["status"], "not-requested")
+        # No review has ever been assigned, so there is no review directory at all.
+        self.assertFalse((runtime / "review").exists())
 
     def test_v020_schema_v1_runtime_without_history_is_compatible(self) -> None:
         runtime = self.init()
@@ -748,19 +739,19 @@ class StateCtlTests(unittest.TestCase):
         )
         snapshot = runtime / "history" / "completion-0001"
         self.assertEqual((snapshot / "STATE.json").read_text(encoding="utf-8"), completed_state)
+        # v1.1 archives only what the project actually has. This project never
+        # assigned a review and never created PLAN.md, OWNER_DIRECTIVES.md,
+        # HANDOFF.md or OWNER_STATUS.md, so none of them are archived.
         for path in (
-            snapshot / "PLAN.md",
-            snapshot / "OWNER_DIRECTIVES.md",
-            snapshot / "HANDOFF.md",
-            snapshot / "OWNER_STATUS.md",
+            snapshot / "memory.jsonl",
             snapshot / "workers" / "worker-1" / "TASK.md",
             snapshot / "workers" / "worker-1" / "STATUS.json",
             snapshot / "workers" / "worker-1" / "BLOCKER.md",
-            snapshot / "review" / "TASK.md",
-            snapshot / "review" / "STATUS.json",
-            snapshot / "review" / "REPORT.md",
         ):
             self.assertTrue(path.is_file(), path)
+        for name in ("PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md", "OWNER_STATUS.md"):
+            self.assertFalse((snapshot / name).exists(), name)
+        self.assertFalse((snapshot / "review").exists())
         self.assertIn(
             "Owner requested an actionable correction.",
             (snapshot / "REOPEN.json").read_text(encoding="utf-8"),

@@ -4,9 +4,11 @@
 
 **先正确完成任务，再让执行、协调、等待与返工保持低成本。**
 
-状态：**v1.0.0 · Apache-2.0 · Benchmark pending**
+状态：**v1.1.0 · Apache-2.0 · Benchmark pending**
 
 以 `$apm` 调用的 Codex 技能。默认由单个 agent 完成任务；多 agent 是一项可选能力，而非必需品。全部状态存放在仓库中，任何 agent 都能接手项目——交接信息不依赖聊天记录。
+
+> **管理者的开销，必须小于它替你省下的工作量。**
 
 ## 为什么需要它
 
@@ -14,6 +16,21 @@
 2. **只读当前任务真正需要的内容。** 上下文编译器（`context --role <角色> --task "<当前任务>"`）返回最小必要上下文，而不是整个项目。协调开销应低于任务 token 的 **10%**。
 3. **委派需要显式开启。** 默认 `standalone` 模式完全不创建 Worker。只有当某块工作确实独立、且收益大于开销时，才用 `set-project --mode leader` 切换——判断依据见[委派策略](references/delegation-policy.md)。
 4. **干净且可恢复的工作空间。** 持久状态文件、原子写入、崩溃恢复，以及有边界的整理机制：隔离可再生的临时产物，同时完整保留证据与交付物。
+
+## standalone 项目只有三个文件
+
+`init` 只创建以下内容，别的一概不建：
+
+```text
+.agent-project-manager/
+├── STATE.json          # 机器权威状态：阶段、状态、下一步
+├── memory.jsonl        # 持久记忆：长期要求、决策、约束、经验
+└── PROJECT_STATUS.md   # 面向人的页面，由上面两者渲染生成
+```
+
+其余文件都在「真正需要它的那条命令」首次运行时才创建——做计划时才有 `PLAN.md`，开启委派时才有 `workers/`，分配审查时才有 `review/`。没有 `HANDOFF.md`：冷启动时按需从状态、记忆与计划现场渲染交接简报，因此不存在需要人工同步、还会过期的摘要。
+
+面向人阅读的 Markdown 放在**项目根目录**（`README.md`、`README.zh-CN.md`）；项目记忆放在 `.agent-project-manager/`，且只使用单一语言——它是给机器看的。
 
 ## 安装与使用
 
@@ -53,7 +70,7 @@ $apm 完成这个项目。除非复用独立 Worker 的总成本确实更低，�
 
 已停止或阻塞的分派可用 `control-worker` 继续、取消或接管：它保留范围与已有部分结果，推进 revision 并隔离过期写入。`reassign-worker` 复用已确认停止的分派；`reopen-project` 在产生新的实质工作前保留完成快照。宿主消息先由 `prepare-message` 预留，宿主发送后再用 `record-message` 关闭，各角色维护自己的 `DELIVERY.json` 回执。详见[状态契约](references/runtime-state.md)、[委派与角色](references/delegation-and-roles.md)、[双向通信](references/host-dispatch.md)、[完整示例](examples/one-worker-flow.md)。
 
-`PROJECT_STATUS.md` 是唯一面向人的页面：简洁、默认双语，并由状态渲染生成（`status-refresh`），而不是手工写日志。
+`PROJECT_STATUS.md` 是唯一面向人的页面：简洁、默认双语，并由状态渲染生成（`status-refresh`），而不是手工写日志。`human-intent` 与 `constraint` 两类记忆条目**永远不会**被 `memory-consolidate` 归档——不论保留窗口多小，它们都是 agent 不得悄悄丢弃的需求。
 
 ## 项目空间整理
 
@@ -79,4 +96,4 @@ python scripts/statectl.py memory-add --project-root /path/to/project --kind con
 python scripts/statectl.py validate --project-root /path/to/project
 ```
 
-CI 覆盖 Windows／Ubuntu × Python 3.9／3.13。测试使用隔离工程与模拟宿主回执，不证明真实桌面对话通信或计费。发布验证见 [v1.0.0 验证说明](benchmarks/v1.0.0-validation.md)。评估场景定义不等于已执行独立 Agent 测试。发布、部署与无关的全局修改仍需用户授权。
+CI 覆盖 Windows／Ubuntu × Python 3.9／3.13。测试使用隔离工程与模拟宿主回执，不证明真实桌面对话通信或计费。发布验证见 [v1.0.0 验证说明](benchmarks/v1.0.0-validation.md) 与 [v1.1.0 验证说明](benchmarks/v1.1.0-validation.md)。评估场景定义不等于已执行独立 Agent 测试。发布、部署与无关的全局修改仍需用户授权。

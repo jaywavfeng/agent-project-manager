@@ -340,10 +340,10 @@ class V070Tests(unittest.TestCase):
         self.assertTrue(directory.exists())
 
         self.status("completed")
-        (self.rt / "HANDOFF.md").write_text("Keep runs/one as evidence", encoding="utf-8")
+        (self.rt / "PLAN.md").write_text("Keep runs/one as evidence", encoding="utf-8")
         self.cli("housekeep", "--apply")
         self.assertTrue(directory.exists())
-        (self.rt / "HANDOFF.md").write_text("No reference", encoding="utf-8")
+        (self.rt / "PLAN.md").write_text("No reference", encoding="utf-8")
         subprocess.run(["git", "init", str(self.root)], capture_output=True, check=True)
         subprocess.run(["git", "-C", str(self.root), "add", "runs"], check=True, capture_output=True)
         self.cli("housekeep", "--apply")

@@ -150,7 +150,8 @@ def eligible(api, runtime, item):
         if item["path"] in task:
             return "active task reference"
     for name in ("PLAN.md", "HANDOFF.md", "OWNER_DIRECTIVES.md"):
-        if item["path"] in (runtime / name).read_text(encoding="utf-8"):
+        reference = runtime / name
+        if reference.is_file() and item["path"] in reference.read_text(encoding="utf-8"):
             return "current canonical reference"
     if state["review"]["reviewer_id"] is not None:
         review_status = api.read_json(runtime / "review/STATUS.json")
@@ -159,7 +160,8 @@ def eligible(api, runtime, item):
         if any(item["path"] in evidence for evidence in review_status["verification"]):
             return "current review verification reference"
         for name in ("TASK.md", "REPORT.md"):
-            if item["path"] in (runtime / "review" / name).read_text(encoding="utf-8"):
+            reference = runtime / "review" / name
+            if reference.is_file() and item["path"] in reference.read_text(encoding="utf-8"):
                 return "current review reference"
     if api.pending_owner_events(runtime):
         return "unresolved Owner feedback"

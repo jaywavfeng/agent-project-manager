@@ -14,7 +14,7 @@ class SkillContractTests(unittest.TestCase):
         match = re.match(r'^---\n(.*?)\n---\n', text, re.DOTALL)
         self.assertIsNotNone(match)
         self.assertIn('name: apm', match.group(1))
-        self.assertIn('version: "1.0.0"', match.group(1))
+        self.assertIn('version: "1.1.0"', match.group(1))
         description = re.search(r'(?m)^description:\s*(.+)$', match.group(1)).group(1)
         self.assertLessEqual(len(description), 1024)
         self.assertLess(len(text.split()), 1600)
@@ -58,10 +58,11 @@ class SkillContractTests(unittest.TestCase):
     def test_public_docs_share_version_interfaces_and_evidence_boundary(self):
         for name in ('README.md', 'README.zh-CN.md'):
             text = (ROOT / name).read_text(encoding='utf-8')
-            for marker in ('v1.0.0', '$apm continue worker-1', '$apm continue lead', '$apm status',
+            for marker in ('v1.1.0', '$apm continue worker-1', '$apm continue lead', '$apm status',
                            'Benchmark pending', '10%', 'purpose_usage', 'TRANSPORT.json', 'VS Code',
                            'python scripts/statectl.py', 'Apache-2.0', 'reassign-worker', 'reopen-project',
-                           'PROJECT_STATUS.md', 'memory.jsonl', 'standalone', 'delegation-policy.md'):
+                           'PROJECT_STATUS.md', 'memory.jsonl', 'standalone', 'delegation-policy.md',
+                           'STATE.json', 'README.zh-CN.md'):
                 self.assertIn(marker, text)
 
     def test_executable_statectl_examples_use_interpreter(self):
@@ -91,6 +92,27 @@ class SkillContractTests(unittest.TestCase):
         for invariant in ('never activates', 'allowed_scope', '--assignment-revision',
                           'Never validate or gate reasoning', 'reopen-project', 'PROJECT_STATUS.md'):
             self.assertIn(invariant, skill)
+
+    def test_storage_convention_and_minimal_init_are_documented(self):
+        """v1.1: three-file standalone, and human docs vs machine memory in separate places."""
+        skill = (ROOT / 'SKILL.md').read_text(encoding='utf-8')
+        # The minimal-init rule and the never-pre-create-scaffolding instruction.
+        self.assertIn('three files', skill)
+        self.assertIn('exactly three files', skill)
+        # Two audiences, two places: bilingual human docs in the root, memory single-language.
+        self.assertIn('README.zh-CN.md', skill)
+        self.assertIn('project root', skill)
+        self.assertIn('single-language', skill)
+        # Intent and constraints are never archived.
+        self.assertIn('never archived', skill)
+
+    def test_handoff_template_is_removed_but_legacy_read_survives(self):
+        self.assertFalse((ROOT / 'assets/runtime/HANDOFF.md').exists())
+        relay = (ROOT / 'scripts/relay.py').read_text(encoding='utf-8')
+        # A pre-v1.1 runtime may still carry one; reading it must not crash.
+        self.assertIn('legacy_handoff', relay)
+        statectl = (ROOT / 'scripts/statectl.py').read_text(encoding='utf-8')
+        self.assertIn('def synthesize_handoff', statectl)
 
 
 if __name__ == '__main__':

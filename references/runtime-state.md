@@ -5,7 +5,6 @@ Read once before changing runtime state; ordinary continuation uses role context
 | Files | Writer and purpose |
 |---|---|
 | STATE.json, PLAN.md, OWNER_DIRECTIVES.md | Lead: lifecycle, stable criteria, current Owner direction |
-| HANDOFF.md | Lead: bounded takeover packet for a cold start |
 | PROJECT_STATUS.md, optional OWNER_STATUS.md | Lead: bilingual human-facing status page; never machine authority |
 | memory.jsonl, memory-archive.md | Lead: compressed durable memory and its consolidated archive |
 | TRANSPORT.json | Lead: bindings and legacy receipts; never lifecycle authority |

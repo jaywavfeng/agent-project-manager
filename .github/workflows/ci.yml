@@ -39,3 +39,6 @@ jobs:
           python scripts/statectl.py housekeep --help
           python scripts/statectl.py workspace-register --help
           python scripts/statectl.py workspace-restore --help
+          python scripts/statectl.py init --help
+          python scripts/statectl.py validate --help
+          python scripts/statectl.py status --help

@@ -4,7 +4,7 @@ description: Give an AI agent persistent project memory, a clean workspace and a
 license: Apache-2.0
 metadata:
   author: "jaywavfeng"
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Agent Project Manager
@@ -18,6 +18,8 @@ Understand the project, read only the memory this task needs, do the work, updat
 Only an explicit `$apm` request activates this skill. Maintaining it, pasting examples and finding existing runtime files never activate it. Finish simple tasks directly without initializing state.
 
 For durable work, initialize once and keep stable goals and acceptance in `PLAN.md`. The default mode is `standalone`: one agent completes the task and no Worker is created. Use `set-project --mode leader` only when separate work is genuinely useful, then read [delegation policy](references/delegation-policy.md) before assigning anything.
+
+`init` creates exactly three files — `STATE.json`, `memory.jsonl` and `PROJECT_STATUS.md`. `PLAN.md`, `workers/`, `review/` and `inbox/owner/` appear only when the command that needs them first runs. Do not pre-create empty scaffolding: the manager must cost less than the work it saves.
 
 Existing `$apm continue worker-N` or `reviewer-N` resumes that role; `$apm continue lead` reads the current leader context. The repository, not chat history, carries the handoff.
 
@@ -35,7 +37,13 @@ Durable compressed memory lives in `.agent-project-manager/memory.jsonl`. Record
 
 Record the user's long-term requirements as `human-intent` — a deployment preference, a dependency they refuse, a feature explicitly out of scope, a rejected design direction, an output-language preference. Record `rejected` whenever a direction was considered and dropped, so a later agent does not silently retry it.
 
-Use `memory-add --kind ... --text ...` to append and `memory-show` to read. Never dump the whole file into context: read only the kinds relevant to the current task. Run `memory-consolidate` when memory has grown noticeably; it compresses and deduplicates old entries and archives them, keeping the active file small.
+Use `memory-add --kind ... --text ...` to append and `memory-show` to read. Never dump the whole file into context: read only the kinds relevant to the current task. Run `memory-consolidate` when memory has grown noticeably; it compresses and deduplicates old entries and archives them, keeping the active file small. `human-intent` and `constraint` entries are never archived, whatever the retention window: they are the requirements an agent must not silently drop.
+
+## Where files live
+
+Two audiences, two places. Human-readable Markdown lives in the **project root** as `README.md` (English) and `README.zh-CN.md` (Chinese). Project memory lives in `.agent-project-manager/` and is single-language — it is machine-facing, so translating it wastes tokens and creates drift.
+
+`PROJECT_STATUS.md` inside the runtime is the one human-facing page that belongs with the state: it is regenerated from `STATE.json` and `memory.jsonl`, so it never goes stale. It is bilingual by default. Keep it short and free of internal agent mechanics.
 
 ## Context compiler
 
@@ -65,7 +73,7 @@ Use `prepare-message`, the host send tool, then `record-message`. A leader dispa
 
 ## Keep the working set small
 
-Ordinary continuation uses one role context, not repeated protocol or history reads. Context pages identify omitted active roles/events; inspect relevant pages before acceptance. Write facts once at assignment, control, blocker, direction or completion transitions. Keep `HANDOFF.md` current and short.
+Ordinary continuation uses one role context, not repeated protocol or history reads. Context pages identify omitted active roles/events; inspect relevant pages before acceptance. Write facts once at assignment, control, blocker, direction or completion transitions. There is no handoff file to keep current: everything a cold start needs is read from `STATE.json`, `memory.jsonl` and `PLAN.md` when it exists.
 
 `PROJECT_STATUS.md` is the human-facing page: concise, bilingual by default, refreshed from state rather than a log. It must not expose internal agent mechanics. `OWNER_STATUS.md` is the older optional variant.
 

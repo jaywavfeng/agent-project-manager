@@ -4,9 +4,11 @@
 
 **Finish the task correctly first, then keep execution, coordination, waiting and rework cheap.**
 
-Status: **v1.0.0 · Apache-2.0 · Benchmark pending**
+Status: **v1.1.0 · Apache-2.0 · Benchmark pending**
 
 A Codex skill invoked as `$apm`. One agent handles the work by default; multiple agents are an optional capability, not a requirement. All state lives in the repository, so any agent can pick the project up — the handoff is never buried in chat history.
+
+> **The manager must cost less than the work it saves.**
 
 ## Why this exists
 
@@ -14,6 +16,21 @@ A Codex skill invoked as `$apm`. One agent handles the work by default; multiple
 2. **Read only what this task needs.** The Context Compiler (`context --role <role> --task "<current task>"`) returns the minimum necessary context instead of the whole project. Coordination should stay under **10%** of task tokens.
 3. **Delegation is opt-in.** The default `standalone` mode has no Workers at all. Switch to `leader` only when a separate, genuinely independent unit of work justifies the overhead — see the [delegation policy](references/delegation-policy.md).
 4. **A clean, recoverable workspace.** Durable state files, atomic writes, crash recovery, and bounded housekeeping that quarantines reproducible temporary output while keeping evidence and deliverables intact.
+
+## A standalone project is three files
+
+`init` creates exactly this, and nothing else:
+
+```text
+.agent-project-manager/
+├── STATE.json          # machine authority: phase, status, next action
+├── memory.jsonl        # durable intent, decisions, constraints, lessons
+└── PROJECT_STATUS.md   # human-facing page, rendered from the two above
+```
+
+Everything else is created by the command that first needs it — `PLAN.md` when you plan, `workers/` when you delegate, `review/` when you assign a review. There is no `HANDOFF.md`: a cold start renders the takeover briefing on demand from state, memory and the plan, so there is no hand-written summary to go stale or to keep in sync.
+
+Human-readable Markdown lives in the **project root** (`README.md`, `README.zh-CN.md`). Project memory lives in `.agent-project-manager/` and is single-language, because it is machine-facing.
 
 ## Install and use
 
@@ -53,7 +70,7 @@ A project starts in `standalone`: one agent reads its context, does the work, ve
 
 A stopped or blocked assignment can be resumed, cancelled or taken over with `control-worker`, which preserves scope and partial results, advances the revision and fences stale updates. `reassign-worker` reuses a confirmed stopped assignment; `reopen-project` preserves a completion snapshot before new actionable work. Host messages are reserved with `prepare-message`, sent by the host, then closed with `record-message` — each role keeps its own `DELIVERY.json` receipts. Details: [state contract](references/runtime-state.md), [delegation and roles](references/delegation-and-roles.md), [host dispatch](references/host-dispatch.md), [worked example](examples/one-worker-flow.md).
 
-`PROJECT_STATUS.md` is the single human-facing page: concise, bilingual by default, and rendered from state (`status-refresh`) rather than written as a log.
+`PROJECT_STATUS.md` is the single human-facing page: concise, bilingual by default, and rendered from state (`status-refresh`) rather than written as a log. `human-intent` and `constraint` memory entries are never archived by `memory-consolidate`, whatever the retention window — they are the requirements an agent must not silently drop.
 
 ## Workspace housekeeping
 
@@ -79,4 +96,4 @@ python scripts/statectl.py memory-add --project-root /path/to/project --kind con
 python scripts/statectl.py validate --project-root /path/to/project
 ```
 
-CI covers Windows/Ubuntu × Python 3.9/3.13. Tests use isolated projects and synthetic host receipts; they do not prove live desktop messaging or billed usage. See the [v1.0.0 validation](benchmarks/v1.0.0-validation.md). Scenario definitions are not a claim of independent Agent execution. Publication, deployment and unrelated global changes still require Owner authority.
+CI covers Windows/Ubuntu × Python 3.9/3.13. Tests use isolated projects and synthetic host receipts; they do not prove live desktop messaging or billed usage. See the [v1.0.0 validation](benchmarks/v1.0.0-validation.md) and the [v1.1.0 validation](benchmarks/v1.1.0-validation.md). Scenario definitions are not a claim of independent Agent execution. Publication, deployment and unrelated global changes still require Owner authority.
