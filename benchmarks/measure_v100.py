@@ -30,14 +30,14 @@ def normalized_packet(script, project):
 
 
 def main():
-    with tempfile.TemporaryDirectory(prefix="tao-v070-proxy-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="apm-v100-proxy-") as temporary:
         base = Path(temporary).resolve()
         archive = subprocess.run(["git", "archive", "--format=zip", BASELINE], cwd=ROOT,
                                  check=True, capture_output=True).stdout
         baseline = base / "baseline"
         with zipfile.ZipFile(io.BytesIO(archive)) as z:
             z.extractall(baseline)
-        files = ["SKILL.md", "references/orchestration-protocol.md", "references/runtime-state.md",
+        files = ["SKILL.md", "references/delegation-and-roles.md", "references/runtime-state.md",
                  "references/host-dispatch.md", "profiles/openai-codex.md"]
         docs = [{"path": f, "before_words": len((baseline / f).read_text(encoding="utf-8").split()),
                  "after_words": len((ROOT / f).read_text(encoding="utf-8").split())} for f in files]
@@ -47,7 +47,7 @@ def main():
         command(script, project, "init", "--project-id", "proxy", "--profile", "generic")
         command(script, project, "add-worker", "--worker-id", "worker-1", "--objective", "Current task",
                 "--allowed-scope", "src/**", "--completion-criterion", "Verified output")
-        runtime = project / ".tiered-agent"
+        runtime = project / ".agent-project-manager"
         cases = []
         for historical_count in (0, 100):
             state = json.loads((runtime / "STATE.json").read_text())
@@ -78,7 +78,7 @@ def main():
                                                     "kind": "protocol-step count, not live-host telemetry"},
                   "actual_coordination_token_ratio": None, "actual_token_target_verified": False,
                   "live_host_dispatch_verified": False}
-        (ROOT / "benchmarks/v0.7.0-static-context.json").write_text(
+        (ROOT / "benchmarks/v1.0.0-static-context.json").write_text(
             json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(json.dumps(result, indent=2, ensure_ascii=False))
 

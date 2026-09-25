@@ -1,82 +1,82 @@
-# tiered-agent-orchestrator
+# agent-project-manager
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-**Correct completion first; minimize execution, coordination, waiting and rework.**
+**Finish the task correctly first, then keep execution, coordination, waiting and rework cheap.**
 
-Project status: **v0.7.0 · Apache-2.0 · Benchmark pending**
+Status: **v1.0.0 · Apache-2.0 · Benchmark pending**
 
-TAO is a Codex skill invoked as `$tao`. A strong Lead decides whether direct execution or a reusable economy Worker costs less overall. Repository state makes handoffs independent of chat history. Simple work needs no orchestration.
+A Codex skill invoked as `$apm`. One agent handles the work by default; multiple agents are an optional capability, not a requirement. All state lives in the repository, so any agent can pick the project up — the handoff is never buried in chat history.
 
-## v0.7.0
+## Why this exists
 
-- Lead can implement, diagnose, test, integrate and safely take over stopped work. `control-worker` preserves scope and evidence while advancing revision; `reassign-worker` can reuse confirmed stopped assignments.
-- Completed historical dependencies no longer prevent role reuse. Review completion and approval are separate; `cancel-review` permits repairs without waiving required review.
-- `prepare-message` and `record-message` support both Lead assignments and Worker/Reviewer callbacks with durable per-role receipts. Duplicate, stale and uncertain events are handled explicitly.
-- Independent conversation creation may use explicit model/reasoning selection with unverified effective metadata. Contradictions require correction. Automatic subagents are disabled; requested routing is not billing proof.
-- Registered task artifacts receive bounded housekeeping at milestones or after seven days on the next substantive continuation. Reproducible temporary output enters seven-day quarantine; evidence and unknown files are retained. There is no background timer.
-- Compact Lead context pages active work instead of expanding terminal verification histories. Resolved feedback leaves the active inbox but remains retrievable by event ID.
+1. **Project memory outlives the agent.** Long-term user intent, decisions, constraints, lessons and rejected directions are stored as compressed entries in `.agent-project-manager/memory.jsonl` — conclusions, never transcripts. Swap the model, keep the project.
+2. **Read only what this task needs.** The Context Compiler (`context --role <role> --task "<current task>"`) returns the minimum necessary context instead of the whole project. Coordination should stay under **10%** of task tokens.
+3. **Delegation is opt-in.** The default `standalone` mode has no Workers at all. Switch to `leader` only when a separate, genuinely independent unit of work justifies the overhead — see the [delegation policy](references/delegation-policy.md).
+4. **A clean, recoverable workspace.** Durable state files, atomic writes, crash recovery, and bounded housekeeping that quarantines reproducible temporary output while keeping evidence and deliverables intact.
 
 ## Install and use
 
-Install GitHub repository `jaywavfeng/tiered-agent-orchestrator`, path `.`, as `tiered-agent-orchestrator` using Codex's skill installer. Invocation remains `tao`. Python 3.9+ and its standard library are sufficient. A release does not automatically replace an existing global installation.
+Install GitHub repository `jaywavfeng/agent-project-manager`, path `.`, as `agent-project-manager` using Codex's skill installer. Invocation is `$apm`. Python 3.9+ and its standard library are sufficient. A release does not automatically replace an existing global installation.
 
 ```text
-$tao Complete this project. Choose direct execution or a reusable independent Worker by total cost. Automatically send assignments and result callbacks between the selected conversations. If needed and supported, create an independent gpt-5.6-luna conversation with xhigh in this current project directory; otherwise give me one setup instruction. Do not use automatic subagents. Keep the gpt-5.6-sol Lead and use gpt-5.6-terra first for escalation.
+$apm Finish this project. Use standalone execution unless a reusable independent Worker genuinely costs less overall. Record my long-term requirements so a later agent does not lose them. Keep the workspace tidy before you declare the project complete.
 ```
 
-Existing authorization persists. Owner-selected conversations preserve their settings; unavailable model selectors and manual reasoning do not create proof loops. Respect actual host permissions and creation capabilities. Bind final task IDs and the same resolved project directory; another worktree is not the same runtime.
+`$apm` only activates on an explicit request. Maintaining this skill, pasting the example above, or discovering an existing `.agent-project-manager` directory never starts it on its own.
 
 | Request | Action |
 |---|---|
-| `$tao continue lead` | Restore current goal, evidence, blockers and next action |
-| `$tao continue worker-1` | Continue the existing scoped assignment |
-| `$tao continue reviewer-1` | Continue the currently assigned review |
-| `$tao status` | Read status without cleanup or other mutation |
+| `$apm <task>` | Start or continue a project |
+| `$apm continue lead` | Restore current goal, evidence, blockers and next action |
+| `$apm continue worker-1` | Continue the existing scoped assignment |
+| `$apm continue reviewer-1` | Continue the currently assigned review |
+| `$apm status` | Read `PROJECT_STATUS.md` and state without cleanup or any other mutation |
 
-Maintaining TAO or finding `.tiered-agent` does not implicitly activate orchestration.
-
-## CLI and state
-
-From this repository:
-
-```console
-python scripts/statectl.py --help
-python scripts/statectl.py init --project-root /path/to/project --project-id my-project
-python scripts/statectl.py context --project-root /path/to/project --role lead
-python scripts/statectl.py control-worker --help
-python scripts/statectl.py prepare-message --help
-python scripts/statectl.py housekeep --project-root /path/to/project
-python scripts/statectl.py validate --project-root /path/to/project
-```
-
-Installed Windows usage:
+Write the state helper in a terminal with a verified Python interpreter and this skill's absolute script path:
 
 ```powershell
-& "<absolute path to python.exe>" "<absolute skill directory>\scripts\statectl.py" context --project-root "<project directory>" --role lead
+& "<absolute path to python.exe>" "<absolute skill directory>\scripts\statectl.py" context --project-root "<project directory>" --role lead --task "<current task>"
 ```
 
-Use real quoted paths. Do not launch a bare `.py` file or open VS Code to perform a state operation. Request the subcommand's `--help` instead of rereading implementation.
+Always invoke it through the interpreter. Never launch a bare `.py` file, and never open VS Code (or any file-opening tool) to perform a state operation. Request a subcommand's `--help` instead of rereading the implementation.
 
-Lead owns global direction, assignments and `TRANSPORT.json`. Current executors own task results; each sender owns its `DELIVERY.json`. `HANDOFF.md` is the bounded takeover packet, and `OWNER_STATUS.md` is optional human presentation. `reassign-worker` archives actual prior state; `reopen-project` preserves completion before actionable new work. Existing schema-v1 projects remain readable without bulk migration. Controlled tasks and new reviews require revision-specific writes. Legacy required reviews need an explicit approved verdict before a new completion decision.
+## Modes and roles
 
-Details: [state contract](references/runtime-state.md), [host messages](references/host-dispatch.md), [example flow](examples/one-worker-flow.md).
+A project starts in `standalone`: one agent reads its context, does the work, verifies it against the acceptance criteria, updates state and memory, and stops. No roles are created for simple work.
+
+`set-project --mode leader` opts into working with others. Only then do `worker` and `reviewer` exist:
+
+- **lead** — owns direction, assignments and `TRANSPORT.json`; keeps final user-facing writing, architecture decisions and acceptance.
+- **worker** — owns a bounded objective, `allowed_scope` and its own results; writes only through `--assignment-revision`.
+- **reviewer** — records both review completion and a `--verdict approved|changes-requested`, so a finished review is never mistaken for approval.
+
+A stopped or blocked assignment can be resumed, cancelled or taken over with `control-worker`, which preserves scope and partial results, advances the revision and fences stale updates. `reassign-worker` reuses a confirmed stopped assignment; `reopen-project` preserves a completion snapshot before new actionable work. Host messages are reserved with `prepare-message`, sent by the host, then closed with `record-message` — each role keeps its own `DELIVERY.json` receipts. Details: [state contract](references/runtime-state.md), [delegation and roles](references/delegation-and-roles.md), [host dispatch](references/host-dispatch.md), [worked example](examples/one-worker-flow.md).
+
+`PROJECT_STATUS.md` is the single human-facing page: concise, bilingual by default, and rendered from state (`status-refresh`) rather than written as a log.
 
 ## Workspace housekeeping
 
-Register existing output directories by task/run through `workspace-register`. Temporary output needs a regeneration method; moving intermediate output needs explicit movable classification. Release requires evidence that producers, background processes and consumers have stopped. The helper also checks current references, scope, Git-tracked content and unsafe paths; it cannot infer every external dependency.
+Register output directories per task or run with `workspace-register`. `housekeep` previews without mutating anything; `housekeep --apply` performs only authorized work, and `--if-due` skips checks within seven days. `workspace-restore` brings released output back without overwriting current files.
 
-`housekeep` previews without mutation. `housekeep --apply` performs authorized work; `--if-due` skips checks within seven days. `workspace-restore` restores stored output without overwrite. Source, raw input, evidence, deliverables and unknown directories are preserved. No periodic whole-project content scan, age-based evidence deletion or automatic cleanup of unrelated global backups occurs. Final housekeeping runs before project completion freezes state.
-
-Full policy and examples: [workspace housekeeping](references/workspace-housekeeping.md).
+Source, raw input, evidence, deliverables and unknown directories are always preserved. Reproducible temporary artifacts enter a seven-day quarantine. There is no periodic whole-project scan, no age-based evidence deletion and no background timer. Policy and examples: [workspace housekeeping](references/workspace-housekeeping.md).
 
 ## Evidence and validation
 
-Target **coordination tokens / actual-task tokens <= 10%**. Substantive Lead execution and acceptance are task work. Missing purpose attribution means unmeasured, not zero overhead. Optional `purpose_usage` and its accounting rules are described in [benchmarks](benchmarks/README.md). No daily ledger is required. Context words and tool-call counts are proxies, not measured token/credit savings.
+Target: **coordination tokens / actual-task tokens <= 10%**. Substantive lead execution and acceptance count as task work. Missing purpose attribution means *unmeasured*, not zero overhead — optional `purpose_usage` and its accounting rules are described in the [benchmark guide](benchmarks/README.md). No daily ledger is required, and context words or tool-call counts are proxies, not proven token or credit savings.
 
 ```console
 python -m unittest discover -s tests -v
 python scripts/benchmark.py --help
 ```
 
-CI covers Windows/Ubuntu × Python 3.9/3.13. Tests use isolated projects and synthetic host receipts; they do not prove live desktop messaging or billed usage. See [v0.7.0 validation](benchmarks/v0.7.0-validation.md). Scenario definitions are not a claim of independent Agent execution. Publication, deployment and unrelated global changes still require Owner authority.
+From this repository checkout you can also drive the helper directly:
+
+```console
+python scripts/statectl.py init --project-root /path/to/project --project-id my-project
+python scripts/statectl.py context --project-root /path/to/project --role lead --task "fix the parser"
+python scripts/statectl.py memory-add --project-root /path/to/project --kind constraint --text "No new runtime dependencies"
+python scripts/statectl.py validate --project-root /path/to/project
+```
+
+CI covers Windows/Ubuntu × Python 3.9/3.13. Tests use isolated projects and synthetic host receipts; they do not prove live desktop messaging or billed usage. See the [v1.0.0 validation](benchmarks/v1.0.0-validation.md). Scenario definitions are not a claim of independent Agent execution. Publication, deployment and unrelated global changes still require Owner authority.

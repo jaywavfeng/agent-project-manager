@@ -5,7 +5,9 @@ Read once before changing runtime state; ordinary continuation uses role context
 | Files | Writer and purpose |
 |---|---|
 | STATE.json, PLAN.md, OWNER_DIRECTIVES.md | Lead: lifecycle, stable criteria, current Owner direction |
-| HANDOFF.md, optional OWNER_STATUS.md | Lead: bounded takeover packet and optional human report |
+| HANDOFF.md | Lead: bounded takeover packet for a cold start |
+| PROJECT_STATUS.md, optional OWNER_STATUS.md | Lead: bilingual human-facing status page; never machine authority |
+| memory.jsonl, memory-archive.md | Lead: compressed durable memory and its consolidated archive |
 | TRANSPORT.json | Lead: bindings and legacy receipts; never lifecycle authority |
 | workers/worker-N/TASK.md | Lead: current assignment and revision |
 | Worker STATUS.json and BLOCKER.md | Current executor: results, evidence and next action |
@@ -21,7 +23,7 @@ Default Worker executor is worker. Optional executor=lead records a takeover wit
 
 Worker states remain ready, active, blocked, waiting-owner, completed and inactive. control-worker --action resume|cancel|takeover requires revision, reason and quiescence-evidence. All three archive the actual old files and advance revision; resume produces ready/worker, takeover ready/lead, cancel inactive/worker. Dependencies still constrain execution and scope overlap is forbidden. Completed tasks use reassign-worker. Reassigning other stopped statuses requires reason and quiescence evidence; previously controlled roles also require revision.
 
-History records truthful prior states, including blocked or cancelled work. Terminal historical dependencies do not track a role's next assignment. Nonterminal dependents still prevent upstream reassignment; inactive never satisfies an input dependency. Assignment revisions and existing history directory names remain compatible with v0.6.0.
+History records truthful prior states, including blocked or cancelled work. Terminal historical dependencies do not track a role's next assignment. Nonterminal dependents still prevent upstream reassignment; inactive never satisfies an input dependency. Assignment revisions and existing history directory names remain stable across releases.
 
 assign-review gives each new review a revision. set-review-status passes --assignment-revision; a completed review has verdict approved or changes-requested. An absent legacy verdict never implies approval: inspect the report and record it. cancel-review requires revision, reason and stopped reviewer evidence, archives the review, detaches it and returns to execution while retaining review.required. Old reviewer writes fail. Subsequent implementation invalidates completed review as before.
 
@@ -35,4 +37,4 @@ context --role lead pages active Workers and pending events with --offset and --
 
 Owner-event frontmatter, not quoted message text, determines pending/resolved state. Housekeeping moves resolved events to inbox/owner/history; resolving by ID works in either location and is idempotent. Unresolved events never enter cold storage. Human summaries do not override machine state.
 
-Details: [host messages](host-dispatch.md), [artifact housekeeping](workspace-housekeeping.md), [escalation](escalation-and-review.md).
+Details: [host messages](host-dispatch.md), [artifact housekeeping](workspace-housekeeping.md), [roles](delegation-and-roles.md).

@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 
 
-PROTECTED = {".git", ".tiered-agent", ".venv", "venv", "node_modules", "src", "source",
+PROTECTED = {".git", ".agent-project-manager", ".venv", "venv", "node_modules", "src", "source",
              "data", "raw", "inputs", "evidence", "deliverables", "secrets", ".ssh"}
 
 
@@ -65,7 +65,7 @@ def checked_path(api, root, relative, *, storage=False):
         raise api.StateError("Project root is not an artifact")
     if not storage and any(part.lower() in PROTECTED for part in pure.parts):
         raise api.StateError("Protected source/data/runtime directory")
-    if storage and (len(pure.parts) < 4 or pure.parts[:2] != (".tiered-agent", "storage")
+    if storage and (len(pure.parts) < 4 or pure.parts[:2] != (".agent-project-manager", "storage")
                     or not re.fullmatch(r"[0-9a-f]{32}", pure.parts[2]) or pure.parts[3] != "content"):
         raise api.StateError("Invalid storage location")
     current = root.resolve()
@@ -163,9 +163,6 @@ def eligible(api, runtime, item):
                 return "current review reference"
     if api.pending_owner_events(runtime):
         return "unresolved Owner feedback"
-    from relay import load_transport
-    if any(x["result"] in {"pending", "unknown"} for x in load_transport(api, runtime)["dispatches"].values()):
-        return "uncertain delivery"
     for path in [runtime / "DELIVERY.json", runtime / "review/DELIVERY.json",
                  *runtime.glob("workers/*/DELIVERY.json")]:
         if path.exists() and any(x.get("result") in {"pending", "unknown"}

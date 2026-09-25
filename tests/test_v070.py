@@ -22,8 +22,9 @@ class V070Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name).resolve()
-        self.rt = self.root / ".tiered-agent"
+        self.rt = self.root / ".agent-project-manager"
         self.cli("init", "--project-id", "v070", "--profile", "generic")
+        self._leader_mode = False
 
     def tearDown(self):
         self.temp.cleanup()
@@ -38,7 +39,15 @@ class V070Tests(unittest.TestCase):
     def read(self, path):
         return json.loads((self.rt / path).read_text(encoding="utf-8"))
 
+    def leader_mode(self):
+        """Opt into delegation; standalone is the default and has no roles."""
+        if not self._leader_mode:
+            self.cli("set-project", "--mode", "leader", "--status", "active")
+            self._leader_mode = True
+
     def add(self, role="worker-1", scope="src/a/**", *extra):
+        # Delegation is opt-in: switch modes before registering the first Worker.
+        self.leader_mode()
         self.cli("add-worker", "--worker-id", role, "--objective", "Implement", "--allowed-scope", scope,
                  "--completion-criterion", "Pass", "--coordination-justification", "Independent task", *extra)
 
@@ -139,6 +148,7 @@ class V070Tests(unittest.TestCase):
         self.assertEqual(self.read("workers/worker-1/history/assignment-0001/STATUS.json")["status"], "blocked")
 
     def review(self):
+        self.leader_mode()  # A required review only exists in delegated projects.
         self.cli("assign-review", "--reviewer-id", "reviewer-1", "--level", "balanced",
                  "--objective", "Review", "--completion-criterion", "Approve correct result")
 
@@ -177,7 +187,6 @@ class V070Tests(unittest.TestCase):
         self.prepare("lead", "worker-1", code=2)
         self.receipt(packet)
         self.receipt(packet, "not-sent", code=2)
-        self.cli("dispatch-context", "--worker-id", "worker-1", "--observation", self.observation("worker-1"), code=2)
         self.status("blocked")
         callback = self.prepare("worker-1", "lead")
         self.receipt(callback)
@@ -399,7 +408,7 @@ class V070Tests(unittest.TestCase):
         self.assertFalse(directory.exists())
 
     def test_links_and_escape_rejected(self):
-        for path in ("../outside", "src/cache", "C:/temp", ".tiered-agent/history"):
+        for path in ("../outside", "src/cache", "C:/temp", ".agent-project-manager/history"):
             self.cli("workspace-register", "--path", path, "--producer", "lead", "--assignment-revision", "1",
                      "--kind", "temporary", "--reproduce", "command", code=2)
         directory = self.artifact()

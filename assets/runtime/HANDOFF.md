@@ -1,6 +1,6 @@
 # Lead Handoff
 
-This is the cold-start packet for `$tao continue lead`. Keep it concise and current; link to canonical details instead of copying them.
+This is the cold-start packet for `$apm continue lead`. Keep it concise and current; link to canonical details instead of copying them.
 
 ## Final goal
 

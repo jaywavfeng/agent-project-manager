@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic runtime-state helper for tiered-agent-orchestrator."""
+"""Deterministic runtime-state helper for agent-project-manager."""
 
 from __future__ import annotations
 
@@ -15,9 +15,11 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Optional
 
+from memory import MemoryError as MemoryContentError
+
 
 SCHEMA_VERSION = 1
-RUNTIME_NAME = ".tiered-agent"
+RUNTIME_NAME = ".agent-project-manager"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_ROOT = SKILL_ROOT / "assets" / "runtime"
 PHASES = {"planning", "execution", "review", "complete"}
@@ -32,6 +34,7 @@ WORKER_STATUSES = {
 }
 REVIEW_STATUSES = {"not-requested", "ready", "active", "blocked", "completed"}
 REVIEW_LEVELS = {"none", "balanced", "strong"}
+MODES = {"standalone", "leader"}
 PROJECT_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 WORKER_ID_RE = re.compile(r"^worker-[1-9][0-9]*$")
 REVIEWER_ID_RE = re.compile(r"^reviewer-[1-9][0-9]*$")
@@ -451,7 +454,7 @@ def validate_completion_history(runtime: Path, project_id: str) -> list[str]:
 
 def validate_runtime(runtime: Path, *, include_history: bool = True) -> list[str]:
     errors: list[str] = []
-    for name in ("STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md"):
+    for name in ("STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md", "memory.jsonl"):
         if not (runtime / name).is_file():
             errors.append(f"Missing required file: {runtime / name}")
     for name in ("workers", "inbox/owner", "review"):
@@ -468,6 +471,7 @@ def validate_runtime(runtime: Path, *, include_history: bool = True) -> list[str
     required = {
         "schema_version",
         "project_id",
+        "mode",
         "phase",
         "status",
         "profile",
@@ -486,6 +490,8 @@ def validate_runtime(runtime: Path, *, include_history: bool = True) -> list[str
         errors.append("STATE.json: unsupported schema_version")
     if not isinstance(state["project_id"], str) or not PROJECT_ID_RE.fullmatch(state["project_id"]):
         errors.append("STATE.json: invalid project_id")
+    if state["mode"] not in MODES:
+        errors.append(f"STATE.json: invalid mode {state['mode']!r}")
     if state["phase"] not in PHASES:
         errors.append(f"STATE.json: invalid phase {state['phase']!r}")
     if state["status"] not in PROJECT_STATUSES:
@@ -672,6 +678,12 @@ def validate_runtime(runtime: Path, *, include_history: bool = True) -> list[str
             ):
                 errors.append("STATE.json: complete project has unfinished required review")
 
+    if state["mode"] == "standalone":
+        if state["workers"]:
+            errors.append("STATE.json: standalone mode must not register Workers")
+        if state["review"]["required"]:
+            errors.append("STATE.json: standalone mode must not require a review")
+
     if include_history:
         errors.extend(validate_review_history(runtime / "review"))
         errors.extend(validate_completion_history(runtime, state["project_id"]))
@@ -687,10 +699,10 @@ def assert_valid(runtime: Path) -> None:
 
 def validate_candidate(runtime: Path, changes: dict[str, str]) -> None:
     """Validate current files plus a proposed write set, without copying history."""
-    with tempfile.TemporaryDirectory(prefix="tao-candidate-") as directory:
+    with tempfile.TemporaryDirectory(prefix="apm-candidate-") as directory:
         candidate = Path(directory)
         state = load_state(runtime)
-        paths = {"STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md",
+        paths = {"STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md", "memory.jsonl",
                  "review/TASK.md", "review/STATUS.json", "review/REPORT.md"}
         for entry in state["workers"]:
             paths.update((entry["task_path"], entry["status_path"],
@@ -730,10 +742,13 @@ def command_init(args: argparse.Namespace) -> int:
         state = read_template_json("STATE.json")
         state["project_id"] = args.project_id
         state["profile"] = profile
+        state["mode"] = args.mode
         state["last_updated"] = now
         write_new_json(state_path(staging), state)
+        write_new_text(staging / "memory.jsonl", "")
 
-        replacements = {"{{PROJECT_ID}}": args.project_id}
+        replacements = {"{{PROJECT_ID}}": args.project_id, "{{MODE}}": args.mode,
+                        "{{UPDATED}}": now}
         for source, destination in (
             ("PLAN.md", staging / "PLAN.md"),
             ("OWNER_DIRECTIVES.md", staging / "OWNER_DIRECTIVES.md"),
@@ -751,6 +766,11 @@ def command_init(args: argparse.Namespace) -> int:
         review_status["last_updated"] = now
         write_new_json(staging / "review" / "STATUS.json", review_status)
         assert_valid(staging)
+        # Render the human page from real state rather than shipping placeholders.
+        write_new_text(
+            staging / "PROJECT_STATUS.md",
+            render_project_status(staging, status_snapshot(staging, validate=False)),
+        )
         if runtime.exists():
             raise StateError(f"Runtime appeared during initialization: {runtime}")
         staging.rename(runtime)
@@ -940,6 +960,11 @@ def command_add_worker(args: argparse.Namespace) -> int:
     registry = state["workers"]
     if state["status"] == "complete":
         raise StateError("Cannot add a Worker to a completed project")
+    if state["mode"] == "standalone":
+        raise StateError(
+            "Standalone mode has no Workers; switch to leader mode first with "
+            "set-project --mode leader once delegation is actually justified"
+        )
     if state["phase"] == "review":
         raise StateError(
             "Cannot add a Worker during review; finish the review and return the project "
@@ -1417,14 +1442,12 @@ def archive_project_completion(runtime: Path, reason: str) -> int:
         tempfile.mkdtemp(prefix=f".completion-{revision:04d}-", dir=history_dir)
     )
     try:
-        for name in ("STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md"):
+        for name in ("STATE.json", "PLAN.md", "OWNER_DIRECTIVES.md", "HANDOFF.md", "memory.jsonl"):
             write_new_text(temporary / name, (runtime / name).read_text(encoding="utf-8"))
-        owner_status = runtime / "OWNER_STATUS.md"
-        if owner_status.is_file():
-            write_new_text(
-                temporary / "OWNER_STATUS.md",
-                owner_status.read_text(encoding="utf-8"),
-            )
+        for name in ("OWNER_STATUS.md", "PROJECT_STATUS.md"):
+            optional = runtime / name
+            if optional.is_file():
+                write_new_text(temporary / name, optional.read_text(encoding="utf-8"))
         for worker in state["workers"]:
             task = checked_relative_path(runtime, worker["task_path"], "worker.task_path")
             status = checked_relative_path(runtime, worker["status_path"], "worker.status_path")
@@ -1561,6 +1584,12 @@ def command_set_project(args: argparse.Namespace) -> int:
         state["review"]["reviewer_id"] = None
     if phase == "complete":
         require_completion_ready(runtime, state)
+    if args.mode and args.mode != state["mode"]:
+        if args.mode == "standalone" and state["workers"]:
+            raise StateError("Cannot return to standalone while Workers are registered")
+        if args.mode == "standalone" and state["review"]["required"]:
+            raise StateError("Cannot return to standalone while a review is required")
+        state["mode"] = args.mode
     state["phase"] = phase
     state["status"] = status
     if args.milestone:
@@ -1981,6 +2010,7 @@ def status_snapshot(runtime: Path, *, validate: bool = True) -> dict[str, Any]:
     review_assigned = state["review"]["reviewer_id"] is not None
     return {
         "project_id": state["project_id"],
+        "mode": state["mode"],
         "phase": state["phase"],
         "status": state["status"],
         "current_milestone": state["current_milestone"],
@@ -1997,6 +2027,7 @@ def status_snapshot(runtime: Path, *, validate: bool = True) -> dict[str, Any]:
             ),
         },
         "owner_status": "OWNER_STATUS.md" if (runtime / "OWNER_STATUS.md").is_file() else None,
+        "project_status": "PROJECT_STATUS.md" if (runtime / "PROJECT_STATUS.md").is_file() else None,
         "pending_owner_feedback": len(pending_owner_events(runtime)),
         "next_action": state["next_action"],
         "last_updated": state["last_updated"],
@@ -2006,7 +2037,7 @@ def status_snapshot(runtime: Path, *, validate: bool = True) -> dict[str, Any]:
 def render_status(snapshot: dict[str, Any]) -> str:
     lines = [
         f"Project: {snapshot['project_id']}",
-        f"State: {snapshot['phase']} / {snapshot['status']}",
+        f"State: {snapshot['phase']} / {snapshot['status']} ({snapshot['mode']})",
         f"Milestone: {snapshot['current_milestone']}",
         "Workers:",
     ]
@@ -2030,7 +2061,7 @@ def render_status(snapshot: dict[str, Any]) -> str:
     lines.append(
         "Owner summary: "
         + (
-            f".tiered-agent/{snapshot['owner_status']}"
+            f".agent-project-manager/{snapshot['owner_status']}"
             if snapshot["owner_status"]
             else "not created yet; create it at the next meaningful transition"
         )
@@ -2038,6 +2069,78 @@ def render_status(snapshot: dict[str, Any]) -> str:
     next_action = snapshot["next_action"]
     lines.append(f"Next: {next_action['actor']} — {next_action['instruction']}")
     return "\n".join(lines)
+
+
+def render_project_status(runtime: Path, snapshot: dict[str, Any]) -> str:
+    """Render the human-facing bilingual page. Empty sections are omitted."""
+    from memory import read_entries
+
+    def bilingual(zh: str, en: str) -> str:
+        return f"{zh} / {en}"
+
+    entries = read_entries(runtime) if (runtime / "memory.jsonl").is_file() else []
+    goals = [entry["text"] for entry in entries if entry["kind"] in {"human-intent", "direction"}]
+    decisions = [entry["text"] for entry in entries if entry["kind"] in {"decision", "rejected"}]
+    risks = [entry["text"] for entry in entries if entry["kind"] in {"constraint", "open-question"}]
+
+    lines = [
+        f"# Project Status: {snapshot['project_id']}",
+        "",
+        f"_{bilingual('更新', 'Updated')}: {snapshot['last_updated']} · "
+        f"{bilingual('模式', 'Mode')}: {snapshot['mode']}_",
+        "",
+    ]
+
+    if goals:
+        lines += [f"## {bilingual('目标', 'Goal')}", ""]
+        lines += [f"- {text}" for text in goals]
+        lines.append("")
+
+    lines += [f"## {bilingual('当前状态', 'Current state')}", "", snapshot["current_milestone"], ""]
+
+    active = [w for w in snapshot["workers"] if w["status"] in ACTIVE_WORKER_STATUSES]
+    recent = [w for w in snapshot["workers"] if w["status"] not in ACTIVE_WORKER_STATUSES]
+    if recent:
+        lines += [f"## {bilingual('最近进展', 'Recent progress')}", ""]
+        lines += [f"- {w['id']}: {w['status']} — {w['summary'] or 'No summary.'}" for w in recent]
+        lines.append("")
+
+    open_tasks = [f"- {w['id']}: {w['status']} — {w['next_action'] or w['summary']}" for w in active]
+    if snapshot["pending_owner_feedback"]:
+        open_tasks.append(f"- {bilingual('待用户决定', 'Awaiting an Owner decision')}: "
+                          f"{snapshot['pending_owner_feedback']}")
+    if open_tasks:
+        lines += [f"## {bilingual('待办', 'Open tasks')}", "", *open_tasks, ""]
+
+    if decisions:
+        lines += [f"## {bilingual('关键决策', 'Key decisions')}", ""]
+        lines += [f"- {text}" for text in decisions]
+        lines.append("")
+
+    if risks:
+        lines += [f"## {bilingual('风险', 'Risks')}", ""]
+        lines += [f"- {text}" for text in risks]
+        lines.append("")
+
+    next_action = snapshot["next_action"]
+    lines += [f"## {bilingual('下一步', 'Next step')}", "",
+              f"{next_action['actor']} — {next_action['instruction']}", ""]
+    return "\n".join(lines)
+
+
+def command_status_refresh(args: argparse.Namespace) -> int:
+    runtime = runtime_dir(project_root(args.project_root))
+    snapshot = status_snapshot(runtime)
+    if snapshot["status"] == "complete" and not args.force:
+        raise StateError("Completed project is frozen; pass --force to refresh its status page")
+    target = runtime / "PROJECT_STATUS.md"
+    if target.is_file() and not args.overwrite:
+        raise StateError(
+            f"{target.name} already exists; edit it directly or pass --overwrite to regenerate"
+        )
+    atomic_write_text(target, render_project_status(runtime, snapshot))
+    print(f"Wrote {target}")
+    return 0
 
 
 def command_validate(args: argparse.Namespace) -> int:
@@ -2085,14 +2188,15 @@ def common_project_root(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create, validate, and summarize tiered-agent runtime state."
+        description="Create, validate, and summarize agent-project-manager runtime state."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="Initialize .tiered-agent without overwriting")
+    init_parser = subparsers.add_parser("init", help="Initialize .agent-project-manager without overwriting")
     common_project_root(init_parser)
     init_parser.add_argument("--project-id", required=True)
     init_parser.add_argument("--profile", default="generic")
+    init_parser.add_argument("--mode", choices=sorted(MODES), default="standalone")
     init_parser.set_defaults(func=command_init)
 
     add_parser = subparsers.add_parser("add-worker", help="Register a bounded Worker assignment")
@@ -2144,6 +2248,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     project_parser = subparsers.add_parser("set-project", help="Update Project Lead-owned global state")
     common_project_root(project_parser)
+    project_parser.add_argument("--mode", choices=sorted(MODES), help="standalone (default) or leader")
     project_parser.add_argument("--phase", choices=sorted(PHASES))
     project_parser.add_argument("--status", choices=sorted(PROJECT_STATUSES))
     project_parser.add_argument("--milestone")
@@ -2205,6 +2310,13 @@ def build_parser() -> argparse.ArgumentParser:
     common_project_root(status_parser)
     status_parser.add_argument("--json", action="store_true", help="Emit a JSON snapshot")
     status_parser.set_defaults(func=command_status)
+    refresh_parser = subparsers.add_parser(
+        "status-refresh", help="Regenerate the bilingual human-facing PROJECT_STATUS.md"
+    )
+    common_project_root(refresh_parser)
+    refresh_parser.add_argument("--overwrite", action="store_true")
+    refresh_parser.add_argument("--force", action="store_true", help="Allow refreshing a completed project")
+    refresh_parser.set_defaults(func=command_status_refresh)
     recover_parser = subparsers.add_parser("recover", help="Explicitly recover a reported interrupted update")
     common_project_root(recover_parser)
     recover_parser.set_defaults(func=command_status, json=False)
@@ -2212,8 +2324,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_commands(subparsers, sys.modules[__name__])
     from lifecycle import add_commands as add_lifecycle_commands
     from workspace import add_commands as add_workspace_commands
+    from memory import add_commands as add_memory_commands
     add_lifecycle_commands(subparsers, sys.modules[__name__])
     add_workspace_commands(subparsers, sys.modules[__name__])
+    add_memory_commands(subparsers, sys.modules[__name__])
     return parser
 
 
@@ -2241,6 +2355,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     except StateError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
+    except MemoryError as exc:
+        # A genuine out-of-memory condition: report it instead of a traceback.
+        print(f"ERROR: out of memory: {exc}", file=sys.stderr)
+        return 1
+    except MemoryContentError as exc:
+        # Malformed memory content is a state problem, not an internal crash.
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ All commands use explicit Python plus the absolute installed script path. No add
 
 ## Preserve evidence and recoverability
 
-Released intermediate directories move to .tiered-agent/storage/<batch>/content. Released reproducible temporary directories first move there as quarantined. Only a subsequent normal housekeeping pass at least 7 days later can permanently delete unchanged quarantined content. Evidence, deliverables and historical task/review/completion records have no age-based deletion policy.
+Released intermediate directories move to .agent-project-manager/storage/<batch>/content. Released reproducible temporary directories first move there as quarantined. Only a subsequent normal housekeeping pass at least 7 days later can permanently delete unchanged quarantined content. Evidence, deliverables and historical task/review/completion records have no age-based deletion policy.
 
 Each batch records the original path, destination, reason, metadata inventory and operation outcome before moving. Changed content, unsafe paths, source/target conflicts and failed moves are retained for inspection. Interrupted moves/restores reconcile on the next explicit apply/restore; conflicting contents are never overwritten. Quarantined files changed after the move are not deleted. The retained regeneration method remains available after deletion.
 

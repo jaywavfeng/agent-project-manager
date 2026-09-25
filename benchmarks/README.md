@@ -30,7 +30,7 @@ One completed run may include `purpose_usage`. This does not require a paired st
 
 The three counts sum to the run's `tokens.total`. Include the same host-reported token categories throughout: input, output and reported reasoning/cache categories without double counting. Document that accounting convention with the source. Missing token categories or mixed work that cannot be classified belong in `unclassified`; if total usage itself is unavailable, do not manufacture a benchmark run.
 
-- `coordination`: TAO protocol loading, bookkeeping, bindings, dispatch/callbacks, unnecessary polling and repeated management context.
+- `coordination`: agent-project-manager protocol loading, bookkeeping, bindings, dispatch/callbacks, unnecessary polling and repeated management context.
 - `task`: intent analysis, architecture, implementation, debugging, experiments, tests and substantive acceptance. Lead work is not automatically coordination; Worker bookkeeping is not automatically task work.
 - `unclassified`: measured tokens whose purpose cannot be reliably separated.
 - `source`: `host-purpose-telemetry` or `documented-purpose-attribution`. Per-model/per-conversation totals alone do not establish purpose.

@@ -13,8 +13,8 @@ class SkillContractTests(unittest.TestCase):
         text = (ROOT / 'SKILL.md').read_text(encoding='utf-8')
         match = re.match(r'^---\n(.*?)\n---\n', text, re.DOTALL)
         self.assertIsNotNone(match)
-        self.assertIn('name: tao', match.group(1))
-        self.assertIn('version: "0.7.0"', match.group(1))
+        self.assertIn('name: apm', match.group(1))
+        self.assertIn('version: "1.0.0"', match.group(1))
         description = re.search(r'(?m)^description:\s*(.+)$', match.group(1)).group(1)
         self.assertLessEqual(len(description), 1024)
         self.assertLess(len(text.split()), 1600)
@@ -32,7 +32,7 @@ class SkillContractTests(unittest.TestCase):
         text = (ROOT / 'agents/openai.yaml').read_text(encoding='utf-8')
         self.assertIn('allow_implicit_invocation: false', text)
         prompt = re.search(r'default_prompt: "([^"]+)"', text).group(1)
-        self.assertTrue(prompt.startswith('$tao'))
+        self.assertTrue(prompt.startswith('$apm'))
         label = re.search(r'short_description: "([^"]+)"', text).group(1)
         self.assertTrue(25 <= len(label) <= 64)
         self.assertNotIn('dependencies:', text)
@@ -46,7 +46,7 @@ class SkillContractTests(unittest.TestCase):
 
     def test_eval_scenarios_keep_existing_cases_and_add_relay_editor_and_budget(self):
         value = json.loads((ROOT / 'evals/evals.json').read_text(encoding='utf-8'))
-        self.assertEqual(value['skill_name'], 'tao')
+        self.assertEqual(value['skill_name'], 'apm')
         ids = [item['id'] for item in value['evals']]
         self.assertEqual(ids[:26], list('ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
         self.assertEqual(len(ids), len(set(ids)))
@@ -58,9 +58,10 @@ class SkillContractTests(unittest.TestCase):
     def test_public_docs_share_version_interfaces_and_evidence_boundary(self):
         for name in ('README.md', 'README.zh-CN.md'):
             text = (ROOT / name).read_text(encoding='utf-8')
-            for marker in ('v0.7.0', '$tao continue worker-1', '$tao continue lead', '$tao status',
+            for marker in ('v1.0.0', '$apm continue worker-1', '$apm continue lead', '$apm status',
                            'Benchmark pending', '10%', 'purpose_usage', 'TRANSPORT.json', 'VS Code',
-                           'python scripts/statectl.py', 'Apache-2.0', 'reassign-worker', 'reopen-project'):
+                           'python scripts/statectl.py', 'Apache-2.0', 'reassign-worker', 'reopen-project',
+                           'PROJECT_STATUS.md', 'memory.jsonl', 'standalone', 'delegation-policy.md'):
                 self.assertIn(marker, text)
 
     def test_executable_statectl_examples_use_interpreter(self):
@@ -85,10 +86,10 @@ class SkillContractTests(unittest.TestCase):
 
     def test_explicit_gate_and_essential_workflow_are_discoverable(self):
         skill = (ROOT / 'SKILL.md').read_text(encoding='utf-8')
-        for reference in ('orchestration-protocol.md', 'runtime-state.md', 'host-dispatch.md', 'escalation-and-review.md'):
+        for reference in ('delegation-and-roles.md', 'runtime-state.md', 'host-dispatch.md', 'delegation-policy.md'):
             self.assertIn(reference, skill)
         for invariant in ('never activates', 'allowed_scope', '--assignment-revision',
-                          'Never validate or gate reasoning', 'reopen-project', 'OWNER_STATUS.md'):
+                          'Never validate or gate reasoning', 'reopen-project', 'PROJECT_STATUS.md'):
             self.assertIn(invariant, skill)
 
 

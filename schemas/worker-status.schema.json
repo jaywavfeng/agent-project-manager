@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/jaywavfeng/tiered-agent-orchestrator/schemas/worker-status.schema.json",
-  "title": "Tiered Agent Worker Status",
+  "$id": "https://github.com/jaywavfeng/agent-project-manager/schemas/worker-status.schema.json",
+  "title": "Agent Project Manager Worker Status",
   "type": "object",
   "additionalProperties": false,
   "required": [

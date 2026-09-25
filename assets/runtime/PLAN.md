@@ -16,6 +16,10 @@ Record durable decisions, their consequences, and requirements that assignments 
 
 Define ordered, observable milestones.
 
+## Delegation
+
+Default is standalone: this agent does the work. Note here only what is delegated, what is deliberately kept, and why. See references/delegation-policy.md.
+
 ## Work allocation
 
 Reference bounded Worker assignments.

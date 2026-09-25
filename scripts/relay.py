@@ -33,13 +33,12 @@ def load_transport(api, runtime):
     path = runtime / "TRANSPORT.json"
     if not path.exists():
         return {"schema_version": 1, "project_id": api.load_state(runtime)["project_id"],
-                "bindings": {}, "dispatches": {}}
+                "bindings": {}}
     value = api.read_json(path)
-    if (set(value) != {"schema_version", "project_id", "bindings", "dispatches"}
+    if (set(value) != {"schema_version", "project_id", "bindings"}
             or value["schema_version"] != 1
             or value["project_id"] != api.load_state(runtime)["project_id"]
-            or not isinstance(value["bindings"], dict)
-            or not isinstance(value["dispatches"], dict)):
+            or not isinstance(value["bindings"], dict)):
         raise api.StateError("Invalid TRANSPORT.json")
     for role, binding in value["bindings"].items():
         if role != "lead" and not api.WORKER_ID_RE.fullmatch(role) and not api.REVIEWER_ID_RE.fullmatch(role):
@@ -55,32 +54,34 @@ def load_transport(api, runtime):
         if binding["route_source"] == "owner" and (
                 not isinstance(binding["evidence"], str) or not binding["evidence"].strip()):
             raise api.StateError("Owner binding requires selection/authorization evidence")
-    for role, receipt in value["dispatches"].items():
-        if (role not in value["bindings"] or not isinstance(receipt, dict)
-                or set(receipt) != {"revision", "result", "evidence"}
-                or type(receipt["revision"]) is not int or receipt["revision"] < 1
-                or not isinstance(receipt["result"], str)
-                or receipt["result"] not in {"pending", "sent", "unknown", "not-sent"}
-                or not isinstance(receipt["evidence"], str)):
-            raise api.StateError("Invalid dispatch receipt")
     return value
 
 
-def check_attestation(api, receipt, binding):
-    """Validate a normalized host receipt, not echoed requested overrides."""
+def check_route(api, receipt, binding, *, require_effective):
+    """Validate a normalized host receipt, not echoed requested overrides.
+
+    ``require_effective`` is True for the attested format, which must prove the
+    effective model/reasoning; the requested format tolerates missing effective
+    values, which then remain explicitly unverified.
+    """
     if not isinstance(receipt, dict):
         raise api.StateError("Missing actual/effective host receipt")
     if receipt.get("runtime_kind", "independent-thread") != "independent-thread":
         raise api.StateError("Automatic subagents are not enabled")
-    required = {"thread_id", "host_id", "requested_model", "requested_reasoning",
-                "effective_model", "effective_reasoning", "source"}
+    required = {"thread_id", "host_id", "requested_model", "requested_reasoning", "source"}
     if not required <= receipt.keys() or any(
             not isinstance(receipt[k], str) or not receipt[k].strip() for k in required):
+        raise api.StateError("Missing model or reasoning evidence")
+    effective = {"effective_model", "effective_reasoning"}
+    if require_effective and not effective <= receipt.keys():
         raise api.StateError("Missing actual/effective model or reasoning evidence")
-    if (receipt["thread_id"] != binding["thread_id"]
-            or receipt["host_id"] != binding["host_id"]
-            or receipt["requested_model"] != receipt["effective_model"]
-            or receipt["requested_reasoning"] != receipt["effective_reasoning"]):
+    if receipt["thread_id"] != binding["thread_id"] or receipt["host_id"] != binding["host_id"]:
+        raise api.StateError("Contradictory host route evidence")
+    if effective <= receipt.keys() and any(
+            not isinstance(receipt[k], str) or not receipt[k].strip() for k in effective):
+        raise api.StateError("Missing actual/effective model or reasoning evidence")
+    if (receipt["requested_model"] != receipt.get("effective_model")
+            or receipt["requested_reasoning"] != receipt.get("effective_reasoning")) and effective <= receipt.keys():
         raise api.StateError("Contradictory actual/effective route evidence")
 
 
@@ -95,9 +96,9 @@ def bound(api, runtime, transport, role, *, require_current=True):
     if Path(binding["cwd"]).resolve() != runtime.parent.resolve():
         raise api.StateError("Bound thread uses a different project directory")
     if binding["route_source"] == "attested":
-        check_attestation(api, binding["evidence"], binding)
+        check_route(api, binding["evidence"], binding, require_effective=True)
     elif binding["route_source"] == "requested":
-        check_requested(api, binding["evidence"], binding)
+        check_route(api, binding["evidence"], binding, require_effective=False)
     return binding
 
 
@@ -131,12 +132,12 @@ def command_bind(args, api):
         if not args.receipt:
             raise api.StateError("Attested binding requires --receipt from the host")
         binding["evidence"] = api.read_json(Path(args.receipt))
-        check_attestation(api, binding["evidence"], binding)
+        check_route(api, binding["evidence"], binding, require_effective=True)
     if args.route_source == "requested":
         if not args.receipt:
             raise api.StateError("Requested route requires independent-thread creation receipt")
         binding["evidence"] = api.read_json(Path(args.receipt))
-        check_requested(api, binding["evidence"], binding)
+        check_route(api, binding["evidence"], binding, require_effective=False)
     transport = load_transport(api, runtime)
     for role, other in transport["bindings"].items():
         if role != args.role and (other["host_id"], other["thread_id"]) == (
@@ -146,9 +147,6 @@ def command_bind(args, api):
     if old and old != binding:
         if not args.replace:
             raise api.StateError("Binding exists; verify replacement then use --replace")
-        last = transport["dispatches"].get(args.role)
-        if last and last["result"] in {"pending", "unknown"}:
-            raise api.StateError("Resolve uncertain delivery before replacing binding")
         if api.WORKER_ID_RE.fullmatch(args.role) and worker(api, runtime, args.role)[4]["status"] == "active":
             raise api.StateError("Cannot replace a running Worker's binding")
         if api.REVIEWER_ID_RE.fullmatch(args.role) and api.read_json(runtime / "review/STATUS.json")["status"] == "active":
@@ -172,6 +170,18 @@ def command_context(args, api):
               "project_status": state["status"], "next_action": state["next_action"],
               "command_argv": [sys.executable, str(api.SKILL_ROOT / "scripts" / "statectl.py")],
               "directives_path": str(runtime / "OWNER_DIRECTIVES.md")}
+    if getattr(args, "task", None):
+        # Context compiler: emit the minimum needed to start this task, not the
+        # whole project memory. Role-specific packets below remain available.
+        from memory import relevant, active_budget_note
+        result["task"] = args.task
+        result["memory"] = relevant(runtime, args.task)
+        result["memory_budget_note"] = active_budget_note(runtime)
+        result["project_status_path"] = (
+            str(runtime / "PROJECT_STATUS.md") if (runtime / "PROJECT_STATUS.md").is_file() else None)
+        result["milestone"] = state["current_milestone"]
+        emit(result)
+        return 0
     if args.role == "lead":
         snapshot = api.status_snapshot(runtime, validate=False)
         active = [w for w in snapshot["workers"] if w["status"] in api.ACTIVE_WORKER_STATUSES]
@@ -220,95 +230,6 @@ def command_context(args, api):
     return 0
 
 
-def dispatch_packet(api, runtime, role, observation):
-    api.assert_valid(runtime)
-    state, entry, _, revision, status = worker(api, runtime, role)
-    if state["status"] != "active" or state["phase"] != "execution":
-        raise api.StateError("Dispatch requires active execution; resolve project decisions first")
-    if status["status"] != "ready":
-        raise api.StateError("Dispatch requires a ready Worker; running/blocked work is not resent")
-    if entry.get("executor", "worker") != "worker":
-        raise api.StateError("Lead-owned assignment cannot be dispatched to Worker")
-    if api.pending_owner_events(runtime):
-        raise api.StateError("Resolve pending Owner feedback before dispatch")
-    for dependency in entry["depends_on"]:
-        if worker(api, runtime, dependency)[4]["status"] != "completed":
-            raise api.StateError(f"Dependency not completed: {dependency}")
-    transport = load_transport(api, runtime)
-    target = bound(api, runtime, transport, role)
-    lead = bound(api, runtime, transport, "lead")
-    check_observation(api, target, observation)
-    previous = transport["dispatches"].get(role)
-    if previous and previous["revision"] == revision and previous["result"] != "not-sent":
-        raise api.StateError("Assignment already sent or uncertain; reconcile once, do not resend")
-    delivery = load_delivery(api, runtime, "lead")["messages"].get(role)
-    if delivery and delivery["revision"] == revision and delivery["result"] != "not-sent":
-        raise api.StateError("Assignment already sent or uncertain")
-    return {"worker_id": role, "assignment_revision": revision,
-            "thread_id": target["thread_id"], "host_id": target["host_id"],
-            "prompt": (f"$tao continue {role}\nProject: {runtime.parent}\n"
-                       f"CLI executable/script argv: {json.dumps([sys.executable, str(api.SKILL_ROOT / 'scripts' / 'statectl.py')])}\n"
-                       f"Assignment revision: {revision}. Use context --assignment-revision {revision} "
-                       "through the explicit Python interpreter before acting; ignore stale messages. "
-                       "Read the current TASK.md and directives, execute within scope, validate, "
-                       "and update only Worker-owned state. At a completion/blocker transition, use "
-                       "notification-context and send its packet once to the bound Lead. "
-                       f"Lead task: {lead['thread_id']} (host {lead['host_id']}).")}
-
-
-def command_dispatch_context(args, api):
-    runtime = api.runtime_dir(api.project_root(args.project_root))
-    emit(dispatch_packet(api, runtime, args.worker_id, api.read_json(Path(args.observation))))
-    return 0
-
-
-def command_record_dispatch(args, api):
-    runtime = api.runtime_dir(api.project_root(args.project_root))
-    api.assert_valid(runtime)
-    state, _, _, revision, _ = worker(api, runtime, args.worker_id)
-    if state["status"] == "complete":
-        raise api.StateError("Completed project is frozen")
-    if args.assignment_revision != revision:
-        raise api.StateError("Stale assignment receipt")
-    transport = load_transport(api, runtime)
-    binding = bound(api, runtime, transport, args.worker_id)
-    if args.thread_id != binding["thread_id"]:
-        raise api.StateError("Receipt target differs from bound thread")
-    last = transport["dispatches"].get(args.worker_id)
-    if args.result == "pending":
-        if not args.observation:
-            raise api.StateError("Reserve delivery with a fresh --observation")
-        dispatch_packet(api, runtime, args.worker_id, api.read_json(Path(args.observation)))
-    elif not last or last["revision"] != revision:
-        raise api.StateError("Reserve pending delivery before recording its result")
-    elif last["result"] == "sent" and args.result != "sent":
-        raise api.StateError("Confirmed delivery cannot be reset or retried")
-    evidence = api.require_nonempty(args.evidence, "evidence")
-    transport["dispatches"][args.worker_id] = {
-        "revision": revision, "result": args.result, "evidence": evidence}
-    api.atomic_write_json(runtime / "TRANSPORT.json", transport)
-    emit({"worker_id": args.worker_id, "assignment_revision": revision, "result": args.result})
-    return 0
-
-
-def command_notification_context(args, api):
-    runtime = api.runtime_dir(api.project_root(args.project_root))
-    api.assert_valid(runtime)
-    state, _, _, revision, status = worker(api, runtime, args.worker_id)
-    if revision != args.assignment_revision:
-        raise api.StateError("Stale assignment notification")
-    if state["status"] == "complete" or status["status"] not in {"completed", "blocked", "waiting-owner"}:
-        raise api.StateError("No actionable Worker transition to notify")
-    target = bound(api, runtime, load_transport(api, runtime), "lead")
-    event = f"{args.worker_id}:{revision}:{status['status']}:{status['last_updated']}"
-    emit({"thread_id": target["thread_id"], "host_id": target["host_id"], "event_id": event,
-          "prompt": (f"$tao continue lead\nProject: {runtime.parent}\nWorker event: {event}\n"
-                     "Read current repository status. Ignore an older assignment revision or a "
-                     "transition already handled; a notification is not acceptance evidence. "
-                     "Resolve the blocker or verify completion, then reuse the Worker when suitable.")})
-    return 0
-
-
 def add_commands(subparsers, api):
     def parser(name, function, help_text):
         value = subparsers.add_parser(name, help=help_text)
@@ -327,19 +248,10 @@ def add_commands(subparsers, api):
     p.add_argument("--replace", action="store_true")
     p = parser("context", command_context, "Read a compact role packet without history or editor UI")
     p.add_argument("--role", required=True)
+    p.add_argument("--task", help="Compile the minimum context for this task instead of a role packet")
     p.add_argument("--assignment-revision", type=int)
     p.add_argument("--offset", type=int, default=0)
     p.add_argument("--limit", type=int, default=20)
-    p = parser("dispatch-context", command_dispatch_context, "Read a validated short Worker message")
-    p.add_argument("--worker-id", required=True)
-    p.add_argument("--observation", required=True, help="Fresh normalized host thread observation JSON")
-    p = parser("record-dispatch", command_record_dispatch, "PROJECT_LEAD: reserve/record one delivery")
-    p.add_argument("--worker-id", required=True)
-    p.add_argument("--thread-id", required=True)
-    p.add_argument("--assignment-revision", type=int, required=True)
-    p.add_argument("--result", choices=["pending", "sent", "unknown", "not-sent"], required=True)
-    p.add_argument("--evidence", required=True)
-    p.add_argument("--observation")
     p = parser("prepare-message", command_prepare_message, "Reserve and emit one role message")
     p.add_argument("--sender", required=True)
     p.add_argument("--recipient", required=True)
@@ -357,24 +269,6 @@ def add_commands(subparsers, api):
     p.add_argument("--event-id", required=True)
     p.add_argument("--result", required=True, choices=["sent", "unknown", "not-sent"])
     p.add_argument("--evidence", required=True)
-    p = parser("notification-context", command_notification_context, "Read a Lead notification; no state writes")
-    p.add_argument("--worker-id", required=True)
-    p.add_argument("--assignment-revision", type=int, required=True)
-
-
-def check_requested(api, receipt, binding):
-    if not isinstance(receipt, dict) or receipt.get("runtime_kind") != "independent-thread":
-        raise api.StateError("Automatic subagents are not enabled; independent-thread receipt required")
-    for key in ("thread_id", "host_id", "requested_model", "requested_reasoning", "source"):
-        if not isinstance(receipt.get(key), str) or not receipt[key].strip():
-            raise api.StateError("Missing explicit model/reasoning creation evidence")
-    if any(receipt[k] != binding[k] for k in ("thread_id", "host_id")):
-        raise api.StateError("Creation receipt identity mismatch")
-    for field in ("model", "reasoning"):
-        effective = receipt.get("effective_" + field)
-        if effective is not None and effective != receipt["requested_" + field]:
-            raise api.StateError("Contradictory actual/effective route evidence")
-
 
 def delivery_path(api, runtime, sender):
     if sender == "lead":
@@ -457,9 +351,6 @@ def command_prepare_message(args, api):
         if not args.observation:
             raise api.StateError("Fresh --observation required for assignment delivery")
         check_observation(api, target, api.read_json(Path(args.observation)))
-        legacy = transport["dispatches"].get(role)
-        if legacy and legacy["revision"] == revision and legacy["result"] != "not-sent":
-            raise api.StateError("Assignment already sent or uncertain in legacy receipt")
     elif status["status"] not in {"completed", "blocked", "waiting-owner"}:
         raise api.StateError("No actionable result transition")
     event = f"{role}:{revision}:{status['status']}:{status['last_updated']}"
@@ -473,7 +364,7 @@ def command_prepare_message(args, api):
                "host_id": target["host_id"], "evidence": "Reserved before host call"}
     value["messages"][args.recipient] = receipt
     api.atomic_write_json(delivery_path(api, runtime, args.sender), value)
-    prompt = (f"$tao continue {args.recipient}\nProject: {runtime.parent}\nEvent: {event}\n"
+    prompt = (f"$apm continue {args.recipient}\nProject: {runtime.parent}\nEvent: {event}\n"
               f"CLI argv: {json.dumps([sys.executable, str(api.SKILL_ROOT / 'scripts/statectl.py')])}\n")
     if args.sender == "lead":
         prompt += (f"Use context --role {role} --assignment-revision {revision}; ignore stale work. "

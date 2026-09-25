@@ -32,11 +32,16 @@ class ForwardScenarioTests(unittest.TestCase):
 
     def init(self) -> Path:
         self.run_cli("init", "--project-id", "forward-test", "--profile", "generic")
-        return self.root / ".tiered-agent"
+        self._leader_mode = False
+        return self.root / ".agent-project-manager"
 
     def add_worker(
         self, worker_id: str, scope: str, *extra: str
     ) -> subprocess.CompletedProcess[str]:
+        # Delegation is opt-in: switch modes before registering the first Worker.
+        if not self._leader_mode:
+            self.run_cli("set-project", "--mode", "leader", "--status", "active")
+            self._leader_mode = True
         return self.run_cli(
             "add-worker",
             "--worker-id",
@@ -206,7 +211,7 @@ class ForwardScenarioTests(unittest.TestCase):
         status = self.run_cli("status").stdout
         self.assertIn("worker-1: blocked", status)
         self.assertIn("Pending Owner feedback: 1", status)
-        escalation = (ROOT / "references" / "escalation-and-review.md").read_text(
+        escalation = (ROOT / "references" / "delegation-and-roles.md").read_text(
             encoding="utf-8"
         )
         self.assertIn("need to copy any context", escalation)

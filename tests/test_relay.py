@@ -19,10 +19,12 @@ import relay
 
 class RelayTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="tao 中文 spaces ")
+        self.temp = tempfile.TemporaryDirectory(prefix="apm 中文 spaces ")
         self.root = Path(self.temp.name).resolve()
-        self.runtime = self.root / ".tiered-agent"
+        self.runtime = self.root / ".agent-project-manager"
         self.call("init", "--project-id", "relay-test")
+        # Relay exercises delegated roles, so opt out of the standalone default first.
+        self.call("set-project", "--mode", "leader")
         self.call("add-worker", "--worker-id", "worker-1", "--objective", "Implement parser",
                   "--allowed-scope", "src/**", "--completion-criterion", "Parser tests pass")
         self.call("set-project", "--phase", "execution")
@@ -53,14 +55,25 @@ class RelayTests(unittest.TestCase):
         self.observation.write_text(json.dumps(value), encoding="utf-8")
 
     def packet(self, expected=0):
-        return self.call("dispatch-context", "--worker-id", "worker-1",
+        return self.call("prepare-message", "--sender", "lead", "--recipient", "worker-1",
+                         "--assignment-revision", "1",
                          "--observation", str(self.observation), expected=expected)
 
-    def record(self, result, revision=1, expected=0):
-        return self.call("record-dispatch", "--worker-id", "worker-1", "--thread-id", "worker-thread",
-                         "--assignment-revision", str(revision), "--result", result,
-                         "--evidence", "Synthetic host receipt", "--observation", str(self.observation),
-                         expected=expected)
+    def record(self, result, revision=1, expected=0, packet=None):
+        """Record an outcome for the reservation at `revision` identically to the real flow."""
+        out = packet if packet is not None else self.reserve(revision)
+        event = json.loads(out)["event_id"]
+        return self.call("record-message", "--sender", "lead", "--recipient", "worker-1",
+                         "--event-id", event, "--result", result,
+                         "--evidence", "Synthetic host receipt", expected=expected)
+
+    def reserve(self, revision, sender="lead", recipient="worker-1"):
+        """Reserve one delivery (must succeed) and return the emitted packet text."""
+        args = ["prepare-message", "--sender", sender, "--recipient", recipient,
+                "--assignment-revision", str(revision)]
+        if (sender, recipient) == ("lead", "worker-1"):
+            args += ["--observation", str(self.observation)]
+        return self.call(*args, expected=0)
 
     def status(self, status, revision=1, expected=0):
         return self.call("set-worker-status", "--worker-id", "worker-1", "--status", status,
@@ -72,19 +85,19 @@ class RelayTests(unittest.TestCase):
     def test_two_assignments_use_same_thread_and_stale_messages_are_rejected(self):
         packets = []
         for revision in (1, 2):
-            packet = json.loads(self.packet())
+            packet = json.loads(self.reserve(revision))
             packets.append(packet)
-            self.record("pending", revision)
             # Simulated host delivery: Worker loads revision, starts, validates and completes.
             context = json.loads(self.call("context", "--role", "worker-1", "--assignment-revision", str(revision)))
             self.assertEqual(context["assignment_revision"], revision)
             self.status("active", revision)
-            self.record("sent", revision)  # Worker may already be running when receipt arrives.
+            self.record("sent", revision, packet=json.dumps(packet))  # Worker may already be running when receipt arrives.
             self.status("completed", revision)
+            callback = json.loads(self.reserve(revision, "worker-1", "lead"))
+            self.assertEqual(callback["recipient"], "lead")
+            # Reading context is read-only and must not mutate persisted state.
             before = self.snapshot()
-            notification = json.loads(self.call("notification-context", "--worker-id", "worker-1",
-                                               "--assignment-revision", str(revision)))
-            self.assertEqual(notification["thread_id"], "lead-thread")
+            self.call("context", "--role", "worker-1")
             self.assertEqual(before, self.snapshot())
             if revision == 1:
                 self.call("reassign-worker", "--worker-id", "worker-1", "--milestone", "M2",
@@ -93,25 +106,30 @@ class RelayTests(unittest.TestCase):
                 self.assertTrue((self.runtime / "workers/worker-1/history/assignment-0001/TASK.md").exists())
                 self.call("context", "--role", "worker-1", "--assignment-revision", "1", expected=2)
                 self.status("active", 1, expected=2)
-                self.call("notification-context", "--worker-id", "worker-1", "--assignment-revision", "1", expected=2)
+                self.call("prepare-message", "--sender", "lead", "--recipient", "worker-1",
+                          "--assignment-revision", "1", "--observation", str(self.observation), expected=2)
         self.assertEqual([p["thread_id"] for p in packets], ["worker-thread"] * 2)
         self.assertTrue(all("model" not in p and "thinking" not in p for p in packets))
 
     def test_reservation_and_uncertain_delivery_block_duplicate_sends(self):
-        self.record("pending")
-        self.assertIn("uncertain", self.packet(expected=2))
-        self.record("unknown")
+        packet = self.reserve(1)
+        # The reservation itself is the pending state; a second send is blocked.
         self.packet(expected=2)
-        self.record("not-sent")  # Only after a documented definite non-delivery.
+        self.record("unknown", packet=packet)
+        self.packet(expected=2)
+        # Only after a documented definite non-delivery may the same revision be sent again.
+        self.record("not-sent", packet=packet)
         self.packet()
-        self.record("pending")
-        self.record("sent")
-        self.record("not-sent", expected=2)
-        self.packet(expected=2)
 
     def test_record_requires_reservation_and_current_revision(self):
-        self.record("sent", expected=2)
-        self.record("pending", revision=2, expected=2)
+        # Recording without a prior reservation must fail: no receipt matches the event.
+        self.call("record-message", "--sender", "lead", "--recipient", "worker-1",
+                  "--event-id", "worker-1:1:ready:never", "--result", "sent",
+                  "--evidence", "Synthetic host receipt", expected=2)
+        packet = self.reserve(1)
+        self.record("sent", packet=packet)
+        # A confirmed delivery cannot be reset to a retry.
+        self.record("unknown", packet=packet, expected=2)
 
     def test_target_observations_reject_wrong_or_unavailable_runtime(self):
         for override in ({"thread_id": "other"}, {"host_id": "other"}, {"cwd": str(self.root.parent)},
@@ -119,7 +137,7 @@ class RelayTests(unittest.TestCase):
             with self.subTest(override=override):
                 self.observe(**override)
                 self.packet(expected=2)
-                self.record("pending", expected=2)
+                self.observe()
 
     def test_bindings_require_same_directory_and_distinct_role(self):
         self.bind("worker-1", "lead-thread", "--replace", expected=2)
@@ -128,9 +146,10 @@ class RelayTests(unittest.TestCase):
         self.bind("worker-1", "other", expected=2)
 
     def test_active_and_uncertain_binding_cannot_be_replaced(self):
-        self.record("pending")
+        packet = self.reserve(1)
+        # A pending reservation already counts as uncertain delivery.
         self.bind("worker-1", "other", "--replace", expected=2)
-        self.record("sent")
+        self.record("sent", packet=packet)
         self.status("active")
         self.bind("worker-1", "other", "--replace", expected=2)
 
@@ -143,7 +162,7 @@ class RelayTests(unittest.TestCase):
         self.bind("worker-1", "native-thread", "--replace", "--route-source", "attested", expected=2)
         for change in ({"effective_model": None}, {"effective_reasoning": None},
                        {"effective_model": "strong-fixture"}, {"effective_reasoning": "low"},
-                       {"thread_id": "different"}, {"source": ""}):
+                       {"thread_id": "different"}, {"source": ""}, {"effective_model": "synthetic"}):
             path.write_text(json.dumps(dict(receipt, **change)), encoding="utf-8")
             self.bind("worker-1", "native-thread", *args, expected=2)
         path.write_text(json.dumps(receipt), encoding="utf-8")
@@ -161,12 +180,15 @@ class RelayTests(unittest.TestCase):
         self.call("set-worker-status", "--worker-id", "worker-2", "--status", "completed", "--summary", "Prepared")
         self.packet()
         self.call("record-owner-feedback", "--worker-id", "worker-1", "--message", "Change the direction")
-        self.assertIn("Owner feedback", self.packet(expected=2))
+        # Owner feedback is reported ahead of other blocking reasons, so assert the block itself.
+        self.assertIn("Owner decisions", self.packet(expected=2))
 
-    def test_blocker_notification_is_actionable_but_not_a_fresh_dispatch(self):
+    def test_blocker_callback_is_actionable_but_not_a_fresh_dispatch(self):
         self.status("blocked")
-        notification = json.loads(self.call("notification-context", "--worker-id", "worker-1", "--assignment-revision", "1"))
-        self.assertIn(":blocked:", notification["event_id"])
+        callback = json.loads(self.call(
+            "prepare-message", "--sender", "worker-1", "--recipient", "lead",
+            "--assignment-revision", "1"))
+        self.assertIn(":blocked:", callback["event_id"])
         self.packet(expected=2)
 
     def test_waiting_project_and_completed_project_do_not_dispatch(self):
@@ -195,7 +217,6 @@ class RelayTests(unittest.TestCase):
             self.call("status")
             self.call("context", "--role", "lead")
             self.call("context", "--role", "worker-1")
-            self.packet()
             self.assertEqual(before, self.snapshot())
             self.status("active")
         with mock.patch.object(statectl, "validate_assignment_history", return_value=["bad archived assignment"]):

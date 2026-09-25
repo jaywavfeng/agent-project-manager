@@ -25,7 +25,7 @@ class StateCtlTests(unittest.TestCase):
 
     def run_cli(self, *args: str) -> tuple[int, str, str]:
         if args and args[0] == "set-review-status" and "--assignment-revision" not in args:
-            path = self.root / ".tiered-agent/review/STATUS.json"
+            path = self.root / ".agent-project-manager/review/STATUS.json"
             if path.exists():
                 revision = json.loads(path.read_text(encoding="utf-8")).get("revision", 1)
                 args = (*args, "--assignment-revision", str(revision))
@@ -42,7 +42,15 @@ class StateCtlTests(unittest.TestCase):
             "init", "--project-id", "sample-project", "--profile", "generic"
         )
         self.assertEqual(result, 0, error)
-        return self.root / ".tiered-agent"
+        self._leader_mode = False
+        return self.root / ".agent-project-manager"
+
+    def leader_mode(self) -> None:
+        """Opt into delegation; standalone is the default and has no roles."""
+        if not getattr(self, "_leader_mode", False):
+            result, _, error = self.run_cli("set-project", "--mode", "leader", "--status", "active")
+            self.assertEqual(result, 0, error)
+            self._leader_mode = True
 
     def add_worker(
         self,
@@ -50,6 +58,8 @@ class StateCtlTests(unittest.TestCase):
         scope: str = "src/**",
         *extra: str,
     ) -> tuple[int, str, str]:
+        # Delegation is opt-in: switch modes before registering the first Worker.
+        self.leader_mode()
         return self.run_cli(
             "add-worker",
             "--worker-id",
@@ -99,7 +109,7 @@ class StateCtlTests(unittest.TestCase):
         self.assertEqual((runtime / "STATE.json").read_bytes(), before)
 
     def test_partial_runtime_is_rejected(self) -> None:
-        (self.root / ".tiered-agent").mkdir()
+        (self.root / ".agent-project-manager").mkdir()
         result, _, error = self.run_cli(
             "init", "--project-id", "sample-project", "--profile", "generic"
         )
@@ -110,7 +120,7 @@ class StateCtlTests(unittest.TestCase):
         original_rename = Path.rename
 
         def crash_before_publish(path: Path, target: Path) -> Path:
-            if Path(target).resolve() == (self.root / ".tiered-agent").resolve():
+            if Path(target).resolve() == (self.root / ".agent-project-manager").resolve():
                 raise RuntimeError("crash before publish")
             return original_rename(path, target)
 
@@ -119,8 +129,8 @@ class StateCtlTests(unittest.TestCase):
                 self.run_cli(
                     "init", "--project-id", "sample-project", "--profile", "generic"
                 )
-        self.assertFalse((self.root / ".tiered-agent").exists())
-        self.assertEqual(self.init(), self.root / ".tiered-agent")
+        self.assertFalse((self.root / ".agent-project-manager").exists())
+        self.assertEqual(self.init(), self.root / ".agent-project-manager")
 
     def test_owner_status_is_created_human_owned_and_legacy_optional(self) -> None:
         runtime = self.init()
@@ -132,7 +142,7 @@ class StateCtlTests(unittest.TestCase):
         )
         result, output, error = self.run_cli("status")
         self.assertEqual(result, 0, error)
-        self.assertIn("Owner summary: .tiered-agent/OWNER_STATUS.md", output)
+        self.assertIn("Owner summary: .agent-project-manager/OWNER_STATUS.md", output)
 
         # Lead-written human presentation is deliberately not a second parsed state schema.
         owner_status.write_text(
@@ -544,6 +554,7 @@ class StateCtlTests(unittest.TestCase):
 
     def test_review_assignment_and_completion(self) -> None:
         self.init()
+        self.leader_mode()  # Reviews only exist in delegated (leader) projects.
         result, _, error = self.run_cli(
             "assign-review",
             "--reviewer-id",

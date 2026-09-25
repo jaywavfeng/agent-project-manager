@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/jaywavfeng/tiered-agent-orchestrator/schemas/state.schema.json",
-  "title": "Tiered Agent Project State",
+  "$id": "https://github.com/jaywavfeng/agent-project-manager/schemas/state.schema.json",
+  "title": "Agent Project Manager State",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,6 +10,7 @@
     "phase",
     "status",
     "profile",
+    "mode",
     "current_milestone",
     "workers",
     "review",
@@ -39,6 +40,13 @@
         "waiting-owner",
         "complete"
       ]
+    },
+    "mode": {
+      "enum": [
+        "standalone",
+        "leader"
+      ],
+      "description": "standalone (default) creates no roles; leader enables worker/reviewer delegation"
     },
     "profile": {
       "type": "string",

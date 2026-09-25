@@ -1,6 +1,6 @@
 # OpenAI Codex Profile
 
-TAO v0.7.0 preserves the model mapping. Routing capabilities are checked against current host tools.
+agent-project-manager v1.0.0 preserves the model mapping. Routing capabilities are checked against current host tools.
 
 | Role | Model | Reasoning | Use |
 |---|---|---|---|

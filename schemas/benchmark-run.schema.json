@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/jaywavfeng/tiered-agent-orchestrator/schemas/benchmark-run.schema.json",
-  "title": "Tiered Agent Benchmark Run",
+  "$id": "https://github.com/jaywavfeng/agent-project-manager/schemas/benchmark-run.schema.json",
+  "title": "Agent Project Manager Benchmark Run",
   "type": "object",
   "additionalProperties": false,
   "required": [

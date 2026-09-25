@@ -8,9 +8,9 @@ Reuse an Owner-selected independent Worker/Reviewer conversation. Preserve its s
 
 Record existing Owner authority once in OWNER_DIRECTIVES.md. Bidirectional messaging authority covers assignments, resume instructions and result callbacks between selected roles. It does not authorize unrelated messages, deployment or publication. Respect host requirements for explicit new-conversation requests and model selection.
 
-Automatic creation is permitted when the host actually offers independent conversations and accepts explicit model and reasoning selection. Check current tool capabilities, not a static claim about a desktop release. Use the selected profile and the actual project directory, not an isolated default worktree. If the capability is missing, give one manual setup instruction with model, reasoning, directory and `$tao continue worker-N`; continue independent useful work. Do not recursively ask for selector screenshots.
+Automatic creation is permitted when the host actually offers independent conversations and accepts explicit model and reasoning selection. Check current tool capabilities, not a static claim about a desktop release. Use the selected profile and the actual project directory, not an isolated default worktree. If the capability is missing, give one manual setup instruction with model, reasoning, directory and `$apm continue worker-N`; continue independent useful work. Do not recursively ask for selector screenshots.
 
-Creation acceptance without effective metadata is unverified routing, not refusal. If actual/effective metadata is present, check it; contradictory values require correction before work. Neither requested nor effective routing proves billed tokens. Automatic subagents are disabled in v0.7.0: they are not independent conversations and do not establish correct billing.
+Creation acceptance without effective metadata is unverified routing, not refusal. If actual/effective metadata is present, check it; contradictory values require correction before work. Neither requested nor effective routing proves billed tokens. Automatic subagents are disabled in v1.0.0: they are not independent conversations and do not establish correct billing.
 
 ## Bind once
 
@@ -40,4 +40,4 @@ On uncertainty, inspect once. Exact event/revision presence establishes delivery
 
 Use passive host waits with cursors, at most 60 seconds per call. One unchanged timeout ends the wait. Result callbacks resume Lead work; do not create periodic polling tasks. Lead verifies actual evidence and continues authorized work without routine Owner approval.
 
-Legacy dispatch-context / record-dispatch / notification-context remain available. New assignment sends check both old and new receipts. Prefer prepare-message / record-message because callbacks then have durable receipts too. Missing tools or bindings retains `$tao continue worker-N`, `$tao continue reviewer-N` and `$tao continue lead` without pretending automation ran.
+Legacy `dispatch-context` / `record-dispatch` / `notification-context` were removed in v1.0.0; `prepare-message` / `record-message` is the only durable receipt path. Missing tools or bindings retains `$apm continue worker-N`, `$apm continue reviewer-N` and `$apm continue lead` without pretending automation ran.

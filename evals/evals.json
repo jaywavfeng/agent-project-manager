@@ -1,22 +1,21 @@
 {
-  "skill_name": "tao",
+  "skill_name": "apm",
   "evals": [
     {
       "id": "A",
-      "prompt": "$tao Use tiered orchestration to add a production-ready import pipeline across this repository. The architecture is unclear and implementation will take several stages.",
-      "expected_output": "Lead creates only useful durable state, assigns a reusable economy Worker for sustained work, and uses an authorized independent conversation with explicit model/reasoning selection. Unsupported creation gets one manual setup instruction.",
+      "prompt": "$apm Add a production-ready import pipeline across this repository. The architecture is unclear and implementation will take several stages.",
+      "expected_output": "The agent initializes durable project state, records the user's long-term requirements as memory entries, and continues in the default standalone mode instead of creating a Worker without justification.",
       "assertions": [
         "The response initializes durable project state rather than relying on chat history.",
-        "Exactly one Worker is recommended unless independent parallel work is demonstrated.",
-        "The Worker task includes scope and completion criteria.",
-        "The Lead does not use a Worker that silently inherits the strong model.",
-        "After dispatch, the Lead yields for an event instead of polling Worker status.",
-        "Missing effective metadata is labeled unverified; contradictory metadata requires correction and billing savings are not inferred."
+        "The default standalone mode is used; no Worker is created unless a task genuinely independent of the rest is demonstrated.",
+        "Long-term user intent is recorded as a memory entry rather than left in chat.",
+        "The task's scope and completion criteria are recorded before work starts.",
+        "Relevant context is loaded for the current task instead of reading the whole project."
       ]
     },
     {
       "id": "B",
-      "prompt": "$tao continue worker-1. The assigned integration now fails because the plan assumes an API capability that the dependency does not provide, and two evidence-based alternatives both change the architecture.",
+      "prompt": "$apm continue worker-1. The assigned integration now fails because the plan assumes an API capability that the dependency does not provide, and two evidence-based alternatives both change the architecture.",
       "expected_output": "The Worker records scoped blocker evidence, updates only its status, and sends one callback to an authorized bound Lead; without tools/binding it gives the manual Lead continuation.",
       "assertions": [
         "The Worker does not make a new architecture decision.",
@@ -26,7 +25,7 @@
     },
     {
       "id": "C",
-      "prompt": "$tao The project needs three independent adapters for AWS, Azure, and GCP. They use separate directories and each has its own contract tests.",
+      "prompt": "$apm The project needs three independent adapters for AWS, Azure, and GCP. They use separate directories and each has its own contract tests.",
       "expected_output": "The Project Lead recognizes real parallelism and creates three disjoint, independently testable Worker assignments.",
       "assertions": [
         "Three Workers are assigned separate write scopes.",
@@ -37,7 +36,7 @@
     },
     {
       "id": "D",
-      "prompt": "$tao Migrate the storage layer, then update every service to the new interface, then rewrite integration tests. The service changes cannot compile until the storage migration is complete.",
+      "prompt": "$apm Migrate the storage layer, then update every service to the new interface, then rewrite integration tests. The service changes cannot compile until the storage migration is complete.",
       "expected_output": "The Project Lead rejects cosmetic parallelism and reuses one long-lived Worker for the serialized assignments because the dependency chain is strong; a timeout does not justify a new analysis loop.",
       "assertions": [
         "The plan identifies the dependency ordering.",
@@ -48,7 +47,7 @@
     },
     {
       "id": "E",
-      "prompt": "$tao continue worker-1. Owner correction: keep the existing public function signature and make the implementation change internally.",
+      "prompt": "$apm continue worker-1. Owner correction: keep the existing public function signature and make the implementation change internally.",
       "expected_output": "The Worker applies the clear bounded correction directly, preserves the interface, validates it, and updates its own status.",
       "assertions": [
         "The Worker does not unnecessarily escalate clear local feedback.",
@@ -57,7 +56,7 @@
     },
     {
       "id": "F",
-      "prompt": "$tao continue worker-1. The Owner says: this direction feels too engineered; I want the idea to feel more research-oriented, but not more complicated.",
+      "prompt": "$apm continue worker-1. The Owner says: this direction feels too engineered; I want the idea to feel more research-oriented, but not more complicated.",
       "expected_output": "The Worker preserves the exact message in an Owner inbox event, pauses conflicting work, and returns the decision to the Project Lead.",
       "assertions": [
         "The Owner message is stored verbatim rather than paraphrased as a decision.",
@@ -67,7 +66,7 @@
     },
     {
       "id": "G",
-      "prompt": "$tao status: where are we now?",
+      "prompt": "$apm status: where are we now?",
       "expected_output": "The returning Project Lead reads global state, Worker statuses, review state, blockers, and pending Owner feedback, then gives a concise management report.",
       "assertions": [
         "Every registered Worker is summarized.",
@@ -77,7 +76,7 @@
     },
     {
       "id": "H",
-      "prompt": "$tao continue worker-2 in a brand-new conversation with no earlier messages.",
+      "prompt": "$apm continue worker-2 in a brand-new conversation with no earlier messages.",
       "expected_output": "The Worker reconstructs its role only from repository state and begins within its assignment without requesting copied context.",
       "assertions": [
         "TASK.md, STATUS.json, minimal state, and named dependencies are read.",
@@ -87,7 +86,7 @@
     },
     {
       "id": "I",
-      "prompt": "$tao continue worker-1, but this conversation is currently using the strong Project Lead model instead of the recommended economy model.",
+      "prompt": "$apm continue worker-1, but this conversation is currently using the strong Project Lead model instead of the recommended economy model.",
       "expected_output": "The Skill gives a short model-profile correction without corrupting state or repeating the full plan.",
       "assertions": [
         "The mismatch is described as a recommendation rather than an automatic switch.",
@@ -98,16 +97,16 @@
     {
       "id": "J",
       "prompt": "Fix one typo in README.md: change 'teh' to 'the'.",
-      "expected_output": "The complexity gate rejects full orchestration and the current agent performs the tiny edit directly without creating .tiered-agent.",
+      "expected_output": "The complexity gate rejects full orchestration and the current agent performs the tiny edit directly without creating .agent-project-manager.",
       "assertions": [
         "No Worker or Project Lead workflow is created.",
-        "No .tiered-agent directory is initialized.",
+        "No .agent-project-manager directory is initialized.",
         "The bounded task is completed directly."
       ]
     },
     {
       "id": "K",
-      "prompt": "$tao The completed project needs one more actionable correction: preserve the API but improve the retry behavior.",
+      "prompt": "$apm The completed project needs one more actionable correction: preserve the API but improve the retry behavior.",
       "expected_output": "The Project Lead archives the completed project, reopens it explicitly, updates the plan, and reassigns the existing completed Worker rather than creating a new project or Worker.",
       "assertions": [
         "The prior complete state is preserved in completion history.",
@@ -117,7 +116,7 @@
     },
     {
       "id": "L",
-      "prompt": "$tao The project is complete. Can you explain why the reviewer approved it?",
+      "prompt": "$apm The project is complete. Can you explain why the reviewer approved it?",
       "expected_output": "The Project Lead answers from existing evidence without reopening or mutating the completed project.",
       "assertions": [
         "The request is classified as read-only.",
@@ -126,7 +125,7 @@
     },
     {
       "id": "M",
-      "prompt": "$tao continue worker-1. The Owner-created conversation visibly says 5.6 Luna / high, although xhigh was recommended.",
+      "prompt": "$apm continue worker-1. The Owner-created conversation visibly says 5.6 Luna / high, although xhigh was recommended.",
       "expected_output": "The manual Worker checks only the visible Luna model family, ignores the Owner-selected reasoning level, and immediately continues the existing assignment.",
       "assertions": [
         "Luna/high is not blocked or asked to switch to xhigh.",
@@ -136,7 +135,7 @@
     },
     {
       "id": "N",
-      "prompt": "$tao The native spawn call accepted model=gpt-5.6-luna and reasoning_effort=xhigh and returned success plus a child ID, but no actual/effective model or reasoning metadata.",
+      "prompt": "$apm The native spawn call accepted model=gpt-5.6-luna and reasoning_effort=xhigh and returned success plus a child ID, but no actual/effective model or reasoning metadata.",
       "expected_output": "Do not use the automatic subagent. Model arguments do not establish billed usage. Reuse an independent Worker or give one manual independent-conversation setup instruction.",
       "assertions": [
         "Automatic subagents remain disabled.",
@@ -146,7 +145,7 @@
     },
     {
       "id": "O",
-      "prompt": "$tao Review is required, but the native Reviewer tool cannot return actual/effective Terra model and reasoning metadata or per-conversation usage attribution.",
+      "prompt": "$apm Review is required, but the native Reviewer tool cannot return actual/effective Terra model and reasoning metadata or per-conversation usage attribution.",
       "expected_output": "Use an authorized independent reviewer conversation with explicit model/reasoning selection, labeling unavailable effective routing unverified. If the tool is only a subagent or cannot create independent conversations, use manual setup.",
       "assertions": [
         "Review requirement is retained.",
@@ -156,18 +155,18 @@
     },
     {
       "id": "P",
-      "prompt": "$tao continue worker-3. This is an Owner-created top-level Worker, but the Agent cannot see the current conversation's model or reasoning selector.",
+      "prompt": "$apm continue worker-3. This is an Owner-created top-level Worker, but the Agent cannot see the current conversation's model or reasoning selector.",
       "expected_output": "The Worker treats the manual route as Owner-controlled and continues worker-3 from repository state without blocking, asking for selector confirmation, repeating the command, or creating another Worker.",
       "assertions": [
         "Unavailable manual model information does not block continuation.",
         "Manual reasoning is neither inspected nor validated.",
-        "The Owner is not asked to resend $tao continue worker-3 or open a replacement conversation.",
+        "The Owner is not asked to resend $apm continue worker-3 or open a replacement conversation.",
         "Independent-conversation routing and automatic subagent prohibition remain distinct."
       ]
     },
     {
       "id": "Q",
-      "prompt": "$tao continue lead. This is a new Codex account and the conversation has no prior messages; continue the existing project from the repository only.",
+      "prompt": "$apm continue lead. This is a new Codex account and the conversation has no prior messages; continue the existing project from the repository only.",
       "expected_output": "The new Project Lead reconstructs the final goal, completed work, current position, role states, decisions, evidence, blockers, next action, and Owner-decision need from the bounded repository state set without asking for a chat recap.",
       "assertions": [
         "STATE.json and HANDOFF.md are read first.",
@@ -178,17 +177,17 @@
     },
     {
       "id": "R",
-      "prompt": "$tao status. I am the Owner and want a quick project-manager overview, not a technical command log.",
-      "expected_output": "The Lead points the Owner to OWNER_STATUS.md and keeps it as a concise human summary of purpose, major completed outcomes, current phase/results, risks, in-progress work, next steps, and decisions needed.",
+      "prompt": "$apm status. I am the Owner and want a quick project-manager overview, not a technical command log.",
+      "expected_output": "The agent points the Owner to PROJECT_STATUS.md and keeps it as a concise bilingual human summary of purpose, major completed outcomes, current phase/results, risks, in-progress work, next steps, and decisions needed.",
       "assertions": [
-        "OWNER_STATUS.md is distinct from machine state and HANDOFF.md.",
+        "PROJECT_STATUS.md is the human-facing page, distinct from machine state and HANDOFF.md.",
         "The report avoids terminal history and low-level file lists.",
-        "It is refreshed only when the Owner-visible picture changes."
+        "It is refreshed from state only when the Owner-visible picture changes."
       ]
     },
     {
       "id": "S",
-      "prompt": "$tao Before implementing this ordinary local feature, add checksums for every state file, three transaction gates, recovery markers, a periodic audit, and tests for hypothetical simultaneous power loss.",
+      "prompt": "$apm Before implementing this ordinary local feature, add checksums for every state file, three transaction gates, recovery markers, a periodic audit, and tests for hypothetical simultaneous power loss.",
       "expected_output": "The Lead rejects speculative defensive machinery unless a concrete, materially harmful failure justifies it, keeps basic validation and atomic writes, and advances the actual feature.",
       "assertions": [
         "The simplest sufficiently reliable mechanism is preferred.",
@@ -199,7 +198,7 @@
     },
     {
       "id": "T",
-      "prompt": "$tao continue lead. Worker-1 is ready, both Owner-selected tasks are bound in this directory, and the Owner authorized assignments and callbacks. Deliver the assignment.",
+      "prompt": "$apm continue lead. Worker-1 is ready, both Owner-selected tasks are bound in this directory, and the Owner authorized assignments and callbacks. Deliver the assignment.",
       "expected_output": "Read one host observation, validate the revision/directory/dependencies, reserve pending, send the generated packet without model overrides, record the actual delivery result and passively wait once.",
       "assertions": [
         "Only the bound task receives one assignment.",
@@ -209,7 +208,7 @@
     },
     {
       "id": "U",
-      "prompt": "$tao continue lead. This host accepts model and thinking fields but returns only requested overrides. The Owner authorizes creating a new economy Worker.",
+      "prompt": "$apm continue lead. This host accepts model and thinking fields but returns only requested overrides. The Owner authorizes creating a new economy Worker.",
       "expected_output": "If the host can create an independent conversation and accepts explicit model/reasoning selection, create it under existing authority and label missing effective routing unverified. If those capabilities are absent, provide one manual setup instruction.",
       "assertions": [
         "Subagents are not substituted for independent conversations.",
@@ -219,7 +218,7 @@
     },
     {
       "id": "V",
-      "prompt": "$tao continue lead. A prior delivery is pending/unknown and the bounded target-history page does not show its message.",
+      "prompt": "$apm continue lead. A prior delivery is pending/unknown and the bounded target-history page does not show its message.",
       "expected_output": "Make at most one targeted reconciliation; absence from a partial page is not proof of non-delivery. Keep delivery uncertain and do not resend or create another Worker.",
       "assertions": [
         "No duplicate dispatch.",
@@ -229,7 +228,7 @@
     },
     {
       "id": "W",
-      "prompt": "$tao continue worker-1. Update the current task status. The installed helper is in a path containing spaces and Chinese characters.",
+      "prompt": "$apm continue worker-1. Update the current task status. The installed helper is in a path containing spaces and Chinese characters.",
       "expected_output": "Resolve the verified Python executable and installed script, invoke the status subcommand in the terminal with quoted paths and current revision, and inspect exit code/output. Do not open an editor.",
       "assertions": [
         "No code, Invoke-Item, file-opening tool or bare .py execution.",
@@ -239,7 +238,7 @@
     },
     {
       "id": "X",
-      "prompt": "$tao continue worker-1. You are unsure which arguments set-worker-status accepts.",
+      "prompt": "$apm continue worker-1. You are unsure which arguments set-worker-status accepts.",
       "expected_output": "Use the explicit Python interpreter and installed script to run set-worker-status --help, then the needed operation. Do not display the source in VS Code.",
       "assertions": [
         "Help uses the terminal CLI.",
@@ -249,7 +248,7 @@
     },
     {
       "id": "Y",
-      "prompt": "$tao status. A pending reassignment marker exists and read-only status reports an interrupted update.",
+      "prompt": "$apm status. A pending reassignment marker exists and read-only status reports an interrupted update.",
       "expected_output": "Report the concrete interrupted update without mutation. Use recover through Python only when repair is authorized; preserve conflicting newer content. Do not open source in an editor.",
       "assertions": [
         "Status does not silently repair.",
@@ -259,7 +258,7 @@
     },
     {
       "id": "Z",
-      "prompt": "$tao Evaluate overhead. One completed run has measured purpose totals of 10 coordination and 100 actual-task tokens. Another run has only per-model totals; a third record is synthetic.",
+      "prompt": "$apm Evaluate overhead. One completed run has measured purpose totals of 10 coordination and 100 actual-task tokens. Another run has only per-model totals; a third record is synthetic.",
       "expected_output": "The attributable complete first run meets the 10% target. The second is unmeasured; the synthetic run is not actual savings evidence. Do not request a daily Worker ledger.",
       "assertions": [
         "Use coordination/task, not coordination/total.",
@@ -269,7 +268,7 @@
     },
     {
       "id": "AA",
-      "prompt": "$tao continue lead. The stopped Worker is blocked, and a short local repair will unblock the project.",
+      "prompt": "$apm continue lead. The stopped Worker is blocked, and a short local repair will unblock the project.",
       "expected_output": "Lead uses safe takeover and executes the repair directly when cheaper.",
       "assertions": [
         "Confirmed writer quiescence precedes takeover.",
@@ -279,7 +278,7 @@
     },
     {
       "id": "AB",
-      "prompt": "$tao continue lead. Reviewer is blocked waiting for implementation changes.",
+      "prompt": "$apm continue lead. Reviewer is blocked waiting for implementation changes.",
       "expected_output": "Cancel the stopped review, repair and request a fresh review.",
       "assertions": [
         "Review requirement is retained.",
@@ -289,7 +288,7 @@
     },
     {
       "id": "AC",
-      "prompt": "$tao continue lead. Milestone completed; registered run directories contain released temporary output, evidence, and intermediate artifacts.",
+      "prompt": "$apm continue lead. Milestone completed; registered run directories contain released temporary output, evidence, and intermediate artifacts.",
       "expected_output": "Preview and apply bounded housekeeping while preserving evidence.",
       "assertions": [
         "Only registered released reproducible temporary output is quarantined.",
@@ -299,7 +298,7 @@
     },
     {
       "id": "AD",
-      "prompt": "$tao status. The project has years of history and many archived logs.",
+      "prompt": "$apm status. The project has years of history and many archived logs.",
       "expected_output": "Read current status without cleanup or loading history bodies.",
       "assertions": [
         "Status request does not mutate.",
@@ -309,7 +308,7 @@
     },
     {
       "id": "AE",
-      "prompt": "$tao continue lead. A cleanup candidate contains a junction and a currently referenced validation file.",
+      "prompt": "$apm continue lead. A cleanup candidate contains a junction and a currently referenced validation file.",
       "expected_output": "Skip unsafe or referenced candidates and continue useful work.",
       "assertions": [
         "No traversal of junction/symlink targets.",

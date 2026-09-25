@@ -1,6 +1,6 @@
 interface:
-  display_name: "Tiered Agent Orchestrator"
-  short_description: "Cost-aware execution, handoffs and workspace housekeeping"
-  default_prompt: "$tao Resume from repository state, choose direct execution or reusable independent Workers by total cost, verify results, and keep coordination and the active workspace small."
+  display_name: "Agent Project Manager"
+  short_description: "Project memory, clean workspaces, optional delegation"
+  default_prompt: "$apm Resume from repository state and project memory, work standalone unless delegation is clearly cheaper, verify results, and keep the active context and workspace small."
 policy:
   allow_implicit_invocation: false
